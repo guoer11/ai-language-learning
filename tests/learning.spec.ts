@@ -139,6 +139,27 @@ test("PWA precaches app for offline reload", async ({ page, context }) => {
     .poll(() => page.evaluate(() => !!navigator.serviceWorker.controller))
     .toBe(true);
   await context.setOffline(true);
+  // Prove the network is unavailable independently of navigator.onLine:
+  // Chromium network emulation does not consistently update that OS-facing flag.
+  expect(
+    await page.evaluate(async () => {
+      try {
+        await fetch(`${location.origin}/learning-offline-probe?${Date.now()}`, {
+          cache: "no-store",
+        });
+        return false;
+      } catch {
+        return true;
+      }
+    }),
+  ).toBe(true);
+  // Separately model the browser's offline status for the status-message UI.
+  await page.addInitScript(() =>
+    Object.defineProperty(navigator, "onLine", {
+      get: () => false,
+      configurable: true,
+    }),
+  );
   await page.reload();
   await expect(page.getByRole("heading", { name: /每天一點點/ })).toBeVisible();
   await expect(
