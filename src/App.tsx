@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useRegisterSW } from "virtual:pwa-register/react";
+import OralPractice, { type OralResult } from "./OralPractice";
 import {
   BookOpen,
   Map as MapIcon,
@@ -26,6 +28,9 @@ import {
   levels,
   lessonNames,
   questions,
+  course,
+  lessonTitle,
+  starsForScore,
   pathKey,
   bestStars,
   readSave,
@@ -56,16 +61,22 @@ export default function App() {
   const [checked, setChecked] = useState(false);
   const [correct, setCorrect] = useState(0);
   const [wrong, setWrong] = useState<string[]>([]);
-  const [speech, setSpeech] = useState<"idle" | "ready" | "done">("idle");
-  const [scenario, setScenario] = useState("correct");
+  const [oral, setOral] = useState<OralResult | null>(null);
+  const [showAudioText, setShowAudioText] = useState(false);
   const [result, setResult] = useState<Attempt | null>(null);
   const [name, setName] = useState("");
   const [notice, setNotice] = useState("");
   const [install, setInstall] = useState(false);
   const [online, setOnline] = useState(navigator.onLine);
+  const {
+    needRefresh: [needRefresh],
+    updateServiceWorker,
+  } = useRegisterSW();
   const profile = save.profiles.find((p) => p.id === save.active)!;
   const path = pathKey(language, level);
   const meta = languages[language];
+  const currentWorld = course(language, level).worlds[0];
+  const mapLessons = currentWorld.units.flatMap((u) => u.lessons);
   const qs = questions(language, level, lesson);
   const q = qs[qi];
   const xp = profile.attempts.reduce((n, a) => n + a.xp, 0);
@@ -113,8 +124,8 @@ export default function App() {
     setChecked(false);
     setCorrect(0);
     setWrong([]);
-    setSpeech("idle");
-    setScenario("correct");
+    setOral(null);
+    setShowAudioText(false);
     setResult(null);
     go("lesson");
   }
@@ -124,7 +135,12 @@ export default function App() {
       return;
     }
     const u = new SpeechSynthesisUtterance(q.target);
-    u.lang = language === "ja" ? "ja-JP" : "en-US";
+    u.lang =
+      q.label === "中文選外語"
+        ? "zh-TW"
+        : language === "ja"
+          ? "ja-JP"
+          : "en-US";
     u.rate = 0.85;
     u.onerror = () => setNotice("語音暫時無法播放，請確認裝置有安裝對應語音。");
     window.speechSynthesis.cancel();
@@ -135,8 +151,9 @@ export default function App() {
       ? answer === q.answer
       : q.type === "order"
         ? order.map((i) => q.tokens![i]).join("|") === q.tokens!.join("|")
-        : scenario === "correct";
+        : oral?.contentCorrect === true;
   function check() {
+    if (checked) return;
     setChecked(true);
     if (isCorrect) setCorrect((v) => v + 1);
     else setWrong((w) => [...w, q.id]);
@@ -147,12 +164,13 @@ export default function App() {
       setChecked(false);
       setAnswer("");
       setOrder([]);
-      setSpeech("idle");
+      setOral(null);
+      setShowAudioText(false);
       return;
     }
     const score = Math.round((correct / qs.length) * 100);
     const passed = score >= 60;
-    const stars = passed ? (score === 100 ? 3 : score >= 80 ? 2 : 1) : 0;
+    const stars = starsForScore(score);
     const record: Attempt = {
       id: crypto.randomUUID(),
       path,
@@ -162,7 +180,9 @@ export default function App() {
       xp: passed ? 20 + correct * 10 : correct * 10,
       stars,
       wrong,
-      mock: true,
+      mock: oral?.source === "demo",
+      curriculumVersion: 2,
+      oral: oral ? { questionId: q.id, ...oral } : undefined,
     };
     setSave((s) => ({
       ...s,
@@ -283,13 +303,28 @@ export default function App() {
           <div className="demo-bar">
             <span>
               <span className="status-dot" />
-              第一版體驗 · 口說與評分為模擬，進度僅存於此瀏覽器
+              學習體驗版 · 進度存於此瀏覽器，發音評估尚未啟用
             </span>
             <button onClick={() => setInstall(true)}>
               <Download size={14} />
               安裝到主畫面
             </button>
           </div>
+          {needRefresh && (
+            <div className="notice" role="status">
+              新版本已就緒，已完成的練習不會遺失。
+              {screen === "lesson" ? (
+                <span> 請先完成或離開這一關再更新。</span>
+              ) : (
+                <button
+                  className="text-button"
+                  onClick={() => updateServiceWorker(true)}
+                >
+                  更新並重新開啟
+                </button>
+              )}
+            </div>
+          )}
           {!online && (
             <div className="notice">目前離線，仍可使用已快取的體驗課程。</div>
           )}
@@ -462,7 +497,7 @@ export default function App() {
                 ))}
               </div>
               <p className="center muted">
-                目前提供各程度世界 1 的示範關卡，完整課程將逐步擴充。
+                每個程度提供世界 1、2 個單元、8 關與 40 題練習，之後持續擴充。
               </p>
             </>
           )}
@@ -478,7 +513,7 @@ export default function App() {
                     WORLD 01 · {levels.find((l) => l.id === level)?.name}
                   </div>
                   <h1>
-                    {meta.flag} {meta.island}的第一站
+                    {meta.flag} {meta.island} · {currentWorld.title}
                   </h1>
                   <p>
                     {level === "beginner"
@@ -497,13 +532,20 @@ export default function App() {
                 </span>
               </section>
               <div className="map-layout">
+                {profile.attempts.some(
+                  (a) => a.path === path && a.curriculumVersion !== 2,
+                ) && (
+                  <p className="legacy-note">
+                    已保留舊版的星星與解鎖進度；這次新增的題目，可以重玩關卡補練。
+                  </p>
+                )}
                 <section className="map-panel">
                   <div className="map-top">
                     <strong>冒險路線</strong>
                     <span>{completed} / 8 關完成</span>
                   </div>
                   <div className="trail">
-                    {lessonNames.map((title, i) => {
+                    {mapLessons.map(({ title, index: i }) => {
                       const stars = bestStars(profile, path, i);
                       const locked = i > 0 && !bestStars(profile, path, i - 1);
                       return (
@@ -539,6 +581,11 @@ export default function App() {
                             </span>
                           </button>
                           <div className="node-copy">
+                            {(i === 0 || i === 4) && (
+                              <p className="unit-label">
+                                {currentWorld.units[i === 0 ? 0 : 1].title}
+                              </p>
+                            )}
                             <span>
                               {i === 7
                                 ? "最終挑戰"
@@ -565,7 +612,7 @@ export default function App() {
                   <section className="panel">
                     <div className="big-emoji">🎒</div>
                     <h3>你的冒險背包</h3>
-                    <p>每關包含選擇、句子排列與口說模擬。</p>
+                    <p>每關 5 題：單字、翻譯、排列、聽力與口說內容比對。</p>
                     <ul>
                       <li>60 分以上即可解鎖下一關</li>
                       <li>答對越多，星星越多</li>
@@ -583,8 +630,8 @@ export default function App() {
                     <Sparkles />
                     <h3>BOSS 正在等你</h3>
                     <p>
-                      第一版先體驗固定情境與模擬回饋。可自由回答的 AI
-                      對話將於後續串接。
+                      BOSS 包含綜合聽力與指定句口說。可自由回答的多輪 AI
+                      對話尚未啟用。
                     </p>
                   </section>
                 </aside>
@@ -609,13 +656,7 @@ export default function App() {
                 </span>
               </div>
               <div className="lesson-header">
-                <span className="tag">
-                  {q.type === "choice"
-                    ? "理解練習"
-                    : q.type === "order"
-                      ? "句子排列"
-                      : "口說體驗 · 模擬"}
-                </span>
+                <span className="tag">{q.label}</span>
                 <h1>{q.prompt}</h1>
                 <p>
                   {q.type === "order"
@@ -632,7 +673,21 @@ export default function App() {
                   >
                     <Volume2 />
                   </button>
-                  <div lang={language}>{q.target}</div>
+                  <div lang={q.label === "中文選外語" ? "zh-Hant" : language}>
+                    {!q.audioOnly || checked || showAudioText
+                      ? q.target
+                      : "先聽聲音，再選答案"}
+                  </div>
+                  {q.audioOnly && !checked && (
+                    <button
+                      className="text-button"
+                      onClick={() => setShowAudioText((v) => !v)}
+                    >
+                      {showAudioText
+                        ? "隱藏文字提示"
+                        : "無法播放？改用文字提示"}
+                    </button>
+                  )}
                   {q.type === "speaking" && <small>{q.translation}</small>}
                 </div>
               )}
@@ -698,88 +753,13 @@ export default function App() {
                 </>
               )}
               {q.type === "speaking" && (
-                <div className="speaking">
-                  <div className="mock-label">
-                    模擬模式：不會啟動麥克風、不錄音、不上傳
-                  </div>
-                  {speech === "idle" ? (
-                    <button
-                      className="mic-button"
-                      onClick={() => setSpeech("ready")}
-                    >
-                      <Mic size={30} />
-                      <span>開始口說模擬</span>
-                    </button>
-                  ) : (
-                    <>
-                      <div className="wave">▂ ▄ ▆ ▃ █ ▄ ▂ ▅ ▇ ▃ ▆ ▂</div>
-                      <label className="scenario">
-                        選擇想體驗的辨識結果
-                        <select
-                          disabled={checked}
-                          value={scenario}
-                          onChange={(e) => {
-                            setScenario(e.target.value);
-                            setSpeech("ready");
-                          }}
-                        >
-                          <option value="correct">內容正確</option>
-                          <option value="wrong">內容不完全正確</option>
-                        </select>
-                      </label>
-                      <button
-                        className="secondary"
-                        disabled={checked}
-                        onClick={() => setSpeech("done")}
-                      >
-                        顯示模擬評分
-                      </button>
-                    </>
-                  )}
-                  {speech === "done" && (
-                    <div className="speech-results">
-                      <div className="section-head">
-                        <strong>模擬辨識文字</strong>
-                        <span className="tag">非真實評估</span>
-                      </div>
-                      <p>
-                        {scenario === "correct"
-                          ? q.target
-                          : language === "en"
-                            ? "I would like some coffee."
-                            : "コーヒーをください。"}
-                      </p>
-                      <div
-                        className={
-                          "content-result " +
-                          (scenario === "correct" ? "" : "bad")
-                        }
-                      >
-                        {scenario === "correct"
-                          ? "✓ 內容符合目標句"
-                          : "△ 內容不完全正確：請確認意思與目標句一致。"}
-                      </div>
-                      <div className="score-grid">
-                        {[
-                          ["Accuracy", "準確度", 88],
-                          ["Fluency", "流暢度", 82],
-                          ["Completeness", "完整度", 90],
-                          ["Total", "總分", 87],
-                        ].map(([en, zh, v]) => (
-                          <div key={en}>
-                            <strong>{v}</strong>
-                            <span>{zh}</span>
-                            <small>{en}</small>
-                          </div>
-                        ))}
-                      </div>
-                      <p className="muted">
-                        以上為固定示意分數，未分析聲音；發音分數與內容正確性分開呈現。
-                      </p>
-                      <p>練習提示：{q.hint}</p>
-                    </div>
-                  )}
-                </div>
+                <OralPractice
+                  key={q.id}
+                  q={q}
+                  language={language}
+                  locked={checked}
+                  onChange={setOral}
+                />
               )}
               {checked && (
                 <div
@@ -816,7 +796,7 @@ export default function App() {
                         ? !answer
                         : q.type === "order"
                           ? order.length !== q.tokens!.length
-                          : speech !== "done"
+                          : oral === null
                     }
                     onClick={check}
                   >
@@ -861,7 +841,7 @@ export default function App() {
                 </div>
               </div>
               <p className="mock-label">
-                此成果包含模擬口說，不代表真實語言能力。
+                此為本機練習成果。口說僅比對文字內容，尚未評估發音。
               </p>
               <div className="result-actions">
                 <button
@@ -904,7 +884,9 @@ export default function App() {
                         {languages[a.path.split(":")[0] as Language].flag}
                       </span>
                       <div>
-                        <h3>{lessonNames[a.lesson]}</h3>
+                        <h3>
+                          {lessonTitle(a.path.split(":")[1] as Level, a.lesson)}
+                        </h3>
                         <p>
                           {
                             levels.find((l) => l.id === a.path.split(":")[1])
@@ -955,7 +937,11 @@ export default function App() {
                 <div className="achievements">
                   {[
                     ["🌱", "勇敢啟程", profile.attempts.length > 0],
-                    ["🌟", "滿星冒險家", allStars >= 3],
+                    [
+                      "🌟",
+                      "滿星冒險家",
+                      profile.attempts.some((a) => a.stars === 3),
+                    ],
                     ["🔥", "三日小火苗", streak(profile) >= 3],
                     [
                       "☀️",
@@ -981,8 +967,17 @@ export default function App() {
                       <div className="history-row" key={a.id}>
                         <span>
                           {languages[a.path.split(":")[0] as Language].flag}{" "}
-                          {lessonNames[a.lesson]}
-                          <small>{a.date} · 模擬模式</small>
+                          {lessonTitle(a.path.split(":")[1] as Level, a.lesson)}
+                          <small>
+                            {a.date} ·{" "}
+                            {a.curriculumVersion === 2
+                              ? a.oral?.source === "browser"
+                                ? "瀏覽器辨識"
+                                : a.oral?.source === "demo"
+                                  ? "示範答案"
+                                  : "輸入練習"
+                              : "舊版模擬紀錄"}
+                          </small>
                         </span>
                         <strong>
                           +{a.xp} XP{" "}
@@ -1072,7 +1067,7 @@ export default function App() {
           )}
           <footer>
             語言小島 <span>·</span> 一起學習，一起看見更大的世界。
-            <small>v0.1.0 · 互動體驗版</small>
+            <small>v0.2.0 · 學習體驗版</small>
           </footer>
         </main>
         <nav className="mobile-nav">

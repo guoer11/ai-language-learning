@@ -1,5 +1,11 @@
 # 共用後端設計提案（未套用）
 
+## v0.2.0 更新說明
+
+2026-09-21 再次唯讀確認 public 仍為原有 3 張 translator_ 資料表，realtime-session 仍為 version 23，未修改後端。此版新增瀏覽器語音辨識（使用者先同意，可能由瀏覽器廠商服務處理）、本機錄音回放及手動內容比對，並非 Supabase / OpenAI / Azure 串接。正式發音分數仍為 null。
+
+新版課程前端已建立 course() 層級模型：每種語言與程度 1 世界、2 單元、8 關、40 題。後面的第一版現況與資料庫表格是歷史檢查與未部署設計，不表示已建立 SQL migration 或 RLS。Google 登入仍待確認完整 Auth redirect allowlist；不得只因看到 Google identities 就視為新 APP 的 OAuth 已可使用。
+
 ## 2026-09-21 實際唯讀檢查
 
 - GitHub main 基準：`629991f3490be5b35de243a69ff5fa8951f6f762`（Initial commit），只有 README.md；未找到 AGENTS.md 或既有應用程式。

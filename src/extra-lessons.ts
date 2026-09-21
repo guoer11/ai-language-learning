@@ -1,0 +1,276 @@
+import type { Language, Level } from "./data";
+export type Material = [string, string, string[], string];
+export const extra: Record<Language, Record<Level, Material[]>> = {
+  ja: {
+    beginner: [
+      [
+        "私は学生です。",
+        "我是學生。",
+        ["私", "は", "学生", "です", "。"],
+        "「は」作為助詞時讀作 wa。",
+      ],
+      [
+        "駅はどこですか。",
+        "車站在哪裡？",
+        ["駅", "は", "どこ", "ですか", "。"],
+        "「どこ」表示哪裡。",
+      ],
+      [
+        "これはいくらですか。",
+        "這個多少錢？",
+        ["これ", "は", "いくら", "ですか", "。"],
+        "「いくら」用來詢問價格。",
+      ],
+      [
+        "明日、公園に行きます。",
+        "明天要去公園。",
+        ["明日", "、", "公園", "に", "行きます", "。"],
+        "「に」標記目的地。",
+      ],
+      [
+        "二人です。",
+        "兩位。",
+        ["二人", "です", "。"],
+        "「二人」讀作 ふたり；可以用來回答餐廳人數。",
+      ],
+    ],
+    intermediate: [
+      [
+        "雨が降っているので、傘を持っていきます。",
+        "因為正在下雨，所以我要帶傘。",
+        ["雨が降っているので", "、", "傘を", "持っていきます", "。"],
+        "「ので」說明原因。",
+      ],
+      [
+        "この電車は京都に止まりますか。",
+        "這班電車會停京都嗎？",
+        ["この電車は", "京都に", "止まりますか", "。"],
+        "「止まります」表示停靠。",
+      ],
+      [
+        "もう少しゆっくり話していただけますか。",
+        "可以請您再說慢一點嗎？",
+        ["もう少し", "ゆっくり", "話していただけますか", "。"],
+        "「いただけますか」是禮貌的請求。",
+      ],
+      [
+        "昨日買った本を読んでいます。",
+        "我正在讀昨天買的書。",
+        ["昨日買った", "本を", "読んでいます", "。"],
+        "「昨日買った」修飾後面的「本」。",
+      ],
+      [
+        "アレルギーがあるので、卵を入れないでください。",
+        "因為我有過敏，請不要加蛋。",
+        ["アレルギーがあるので", "、", "卵を", "入れないでください", "。"],
+        "「ないでください」表示請不要。",
+      ],
+    ],
+    advanced: [
+      [
+        "技術の進歩によって、働き方が変わりつつあります。",
+        "隨著科技進步，工作方式正逐漸改變。",
+        ["技術の進歩によって", "、", "働き方が", "変わりつつあります", "。"],
+        "「つつある」表示變化正在進行。",
+      ],
+      [
+        "必ずしも高い商品が良いとは限りません。",
+        "價格高的商品不一定就是好的。",
+        ["必ずしも", "高い商品が", "良いとは限りません", "。"],
+        "「必ずしも〜とは限らない」表示不一定。",
+      ],
+      [
+        "十分に話し合った上で、結論を出すべきです。",
+        "應該充分討論之後再下結論。",
+        ["十分に話し合った上で", "、", "結論を", "出すべきです", "。"],
+        "「上で」表示先完成某事再進行下一步。",
+      ],
+      [
+        "失敗を恐れるあまり、挑戦を避けてはいけません。",
+        "不能因為太害怕失敗，而逃避挑戰。",
+        ["失敗を恐れるあまり", "、", "挑戦を", "避けてはいけません", "。"],
+        "「あまり」在這裡表示程度過度。",
+      ],
+      [
+        "費用は増えますが、長期的には価値があると思います。",
+        "雖然費用會增加，但我認為長期而言有價值。",
+        ["費用は増えますが", "、", "長期的には", "価値があると思います", "。"],
+        "先承認代價，再表達看法。",
+      ],
+    ],
+  },
+  en: {
+    beginner: [
+      [
+        "I am a student.",
+        "我是學生。",
+        ["I", "am", "a", "student."],
+        "student 前面需要冠詞 a。",
+      ],
+      [
+        "Where is the station?",
+        "車站在哪裡？",
+        ["Where", "is", "the", "station?"],
+        "Where 用來詢問地點。",
+      ],
+      [
+        "How much is this?",
+        "這個多少錢？",
+        ["How much", "is", "this?"],
+        "How much 用來詢問價格。",
+      ],
+      [
+        "I will go to the park tomorrow.",
+        "我明天要去公園。",
+        ["I", "will go", "to the park", "tomorrow."],
+        "tomorrow 表示明天。",
+      ],
+      [
+        "A table for two, please.",
+        "請給我兩人座位。",
+        ["A table", "for two,", "please."],
+        "for two 表示供兩人使用。",
+      ],
+    ],
+    intermediate: [
+      [
+        "It is raining, so I will bring an umbrella.",
+        "正在下雨，所以我會帶傘。",
+        ["It is raining,", "so", "I will bring", "an umbrella."],
+        "umbrella 前面使用 an。",
+      ],
+      [
+        "Does this train stop in Kyoto?",
+        "這班火車會停京都嗎？",
+        ["Does", "this train", "stop", "in Kyoto?"],
+        "Does 後面的動詞用原形 stop。",
+      ],
+      [
+        "Could you speak a little more slowly?",
+        "可以請你說慢一點嗎？",
+        ["Could you", "speak", "a little", "more slowly?"],
+        "more slowly 表示更慢地。",
+      ],
+      [
+        "I am reading the book I bought yesterday.",
+        "我正在讀昨天買的那本書。",
+        ["I am reading", "the book", "I bought", "yesterday."],
+        "I bought yesterday 用來修飾 the book。",
+      ],
+      [
+        "I am allergic to eggs.",
+        "我對蛋過敏。",
+        ["I am", "allergic", "to eggs."],
+        "be allergic to 表示對某物過敏。",
+      ],
+    ],
+    advanced: [
+      [
+        "Technological progress is changing the way we work.",
+        "科技進步正在改變我們的工作方式。",
+        ["Technological progress", "is changing", "the way", "we work."],
+        "the way we work 表示我們工作的方式。",
+      ],
+      [
+        "A higher price does not necessarily mean better quality.",
+        "較高的價格不一定代表較好的品質。",
+        ["A higher price", "does not necessarily", "mean", "better quality."],
+        "not necessarily 表示不一定。",
+      ],
+      [
+        "We should discuss the evidence before drawing a conclusion.",
+        "我們應先討論證據，再下結論。",
+        [
+          "We should",
+          "discuss the evidence",
+          "before",
+          "drawing a conclusion.",
+        ],
+        "draw a conclusion 表示下結論。",
+      ],
+      [
+        "Fear of failure should not prevent us from trying.",
+        "對失敗的恐懼不應阻止我們嘗試。",
+        ["Fear of failure", "should not", "prevent us", "from trying."],
+        "prevent someone from doing 表示阻止某人做某事。",
+      ],
+      [
+        "Although it costs more, I believe it is worthwhile in the long term.",
+        "雖然費用較高，但我認為長期而言是值得的。",
+        [
+          "Although it costs more,",
+          "I believe",
+          "it is worthwhile",
+          "in the long term.",
+        ],
+        "Although 引導讓步子句。",
+      ],
+    ],
+  },
+};
+export const words: Record<Language, Record<Level, [string, string][]>> = {
+  ja: {
+    beginner: [
+      ["こんにちは", "你好"],
+      ["水", "水"],
+      ["ありがとう", "謝謝"],
+      ["学生", "學生"],
+      ["駅", "車站"],
+      ["いくら", "多少錢"],
+      ["明日", "明天"],
+      ["二人", "兩人"],
+    ],
+    intermediate: [
+      ["窓", "窗戶"],
+      ["予約", "預約"],
+      ["料理", "料理"],
+      ["傘", "傘"],
+      ["電車", "電車"],
+      ["ゆっくり", "慢慢地"],
+      ["昨日", "昨天"],
+      ["卵", "蛋"],
+    ],
+    advanced: [
+      ["環境", "環境"],
+      ["安全性", "安全性"],
+      ["尊重", "尊重"],
+      ["進歩", "進步"],
+      ["商品", "商品"],
+      ["結論", "結論"],
+      ["挑戦", "挑戰"],
+      ["長期的", "長期的"],
+    ],
+  },
+  en: {
+    beginner: [
+      ["hello", "你好"],
+      ["water", "水"],
+      ["thank", "感謝"],
+      ["student", "學生"],
+      ["station", "車站"],
+      ["price", "價格"],
+      ["tomorrow", "明天"],
+      ["two", "二"],
+    ],
+    intermediate: [
+      ["window", "窗戶"],
+      ["reservation", "預約"],
+      ["recommend", "推薦"],
+      ["umbrella", "傘"],
+      ["train", "火車"],
+      ["slowly", "慢慢地"],
+      ["yesterday", "昨天"],
+      ["eggs", "蛋"],
+    ],
+    advanced: [
+      ["environmental", "環境的"],
+      ["safety", "安全"],
+      ["perspectives", "觀點"],
+      ["progress", "進步"],
+      ["quality", "品質"],
+      ["evidence", "證據"],
+      ["failure", "失敗"],
+      ["worthwhile", "值得的"],
+    ],
+  },
+};

@@ -1,6 +1,6 @@
 {
   "name": "ai-language-learning",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "AI-powered Japanese and English learning web app",
   "scripts": {
     "dev": "vite --host 0.0.0.0",

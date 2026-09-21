@@ -1,3 +1,4 @@
+import { extra, words } from "./extra-lessons";
 export type Language = "ja" | "en";
 export type Level = "beginner" | "intermediate" | "advanced";
 export type Question = {
@@ -10,6 +11,9 @@ export type Question = {
   answer?: string;
   tokens?: string[];
   hint: string;
+  label?: string;
+  audioOnly?: boolean;
+  alternatives?: string[];
 };
 export const levels: { id: Level; icon: string; name: string; sub: string }[] =
   [
@@ -173,8 +177,107 @@ export const lessonNames = [
   "把句子說出來",
   "開口更有自信",
   "自由練習站",
-  "BOSS・對話挑戰",
+  "BOSS・綜合挑戰",
 ];
+export type CourseLesson = {
+  id: string;
+  index: number;
+  title: string;
+  kind: "normal" | "checkpoint" | "boss";
+};
+export type Course = {
+  id: string;
+  language: Language;
+  level: Level;
+  worlds: {
+    id: string;
+    title: string;
+    units: { id: string; title: string; lessons: CourseLesson[] }[];
+  }[];
+};
+const titles: Record<Level, string[]> = {
+  beginner: [
+    "第一句問候",
+    "禮貌與飲水",
+    "表達感謝",
+    "自我介紹・Checkpoint",
+    "尋找車站",
+    "購物問價",
+    "明日行程",
+    "餐廳入座・BOSS",
+  ],
+  intermediate: [
+    "選擇座位",
+    "更改預約",
+    "餐點推薦",
+    "天氣與原因・Checkpoint",
+    "交通詢問",
+    "請人說慢一點",
+    "分享閱讀",
+    "飲食需求・BOSS",
+  ],
+  advanced: [
+    "環境議題",
+    "便利與安全",
+    "尊重觀點",
+    "科技與工作・Checkpoint",
+    "價格與品質",
+    "證據與結論",
+    "面對失敗",
+    "權衡成本・BOSS",
+  ],
+};
+export function course(language: Language, level: Level): Course {
+  const base = `${language}:${level}`;
+  return {
+    id: base,
+    language,
+    level,
+    worlds: [
+      {
+        id: `${base}:world-1`,
+        title:
+          level === "beginner"
+            ? "日常啟程"
+            : level === "intermediate"
+              ? "生活交流"
+              : "觀點探索",
+        units: [
+          {
+            id: `${base}:unit-1`,
+            title: "單元一 · 建立基礎",
+            lessons: [0, 1, 2, 3].map(make),
+          },
+          {
+            id: `${base}:unit-2`,
+            title: "單元二 · 活用表達",
+            lessons: [4, 5, 6, 7].map(make),
+          },
+        ],
+      },
+    ],
+  };
+  function make(index: number): CourseLesson {
+    return {
+      id: `${base}:lesson-${index}`,
+      index,
+      title: titles[level][index],
+      kind: index === 3 ? "checkpoint" : index === 7 ? "boss" : "normal",
+    };
+  }
+}
+export function lessonTitle(level: Level, index: number) {
+  return titles[level][index] || lessonNames[index];
+}
+export function starsForScore(score: number) {
+  return score < 60 ? 0 : score < 80 ? 1 : score < 100 ? 2 : 3;
+}
+function optionsFor(answer: string, all: string[], seed: number) {
+  const other = [...new Set(all)].filter((x) => x !== answer).slice(0, 3);
+  const list = [...other, answer];
+  const at = seed % list.length;
+  return [...list.slice(at), ...list.slice(0, at)];
+}
 export const pathKey = (language: Language, level: Level) =>
   `${language}:${level}`;
 export function questions(
@@ -182,24 +285,49 @@ export function questions(
   level: Level,
   lesson: number,
 ): Question[] {
-  const entries = corpus[language][level];
-  const entry = entries[lesson % entries.length];
+  const entries = [...corpus[language][level], ...extra[language][level]];
+  const entry = entries[lesson];
   const [target, translation, tokens, hint] = entry;
   const id = `${pathKey(language, level)}:${lesson}`;
+  const vocabulary = words[language][level];
+  const [word, meaning] = vocabulary[lesson];
+  const reverse = lesson % 2 === 1;
+  const listening = entries[lesson === 3 ? 1 : lesson === 7 ? 6 : lesson];
   return [
+    {
+      id: id + ":vocabulary",
+      type: "choice",
+      label: "單字選擇",
+      prompt: "這個單字是什麼意思？",
+      target: word,
+      translation: meaning,
+      answer: meaning,
+      options: optionsFor(
+        meaning,
+        vocabulary.map((v) => v[1]),
+        lesson,
+      ),
+      hint: `${word}：${meaning}`,
+    },
     {
       id: id + ":choice",
       type: "choice",
-      prompt: "這句話的中文意思是什麼？",
-      target,
+      label: reverse ? "中文選外語" : "外語選中文",
+      prompt: reverse ? "選出對應的外語句子" : "這句話的中文意思是什麼？",
+      target: reverse ? translation : target,
       translation,
-      options: [...entries.map((e) => e[1]), "明天再見。"],
-      answer: translation,
+      options: optionsFor(
+        reverse ? target : translation,
+        entries.map((e) => e[reverse ? 0 : 1]),
+        lesson + 1,
+      ),
+      answer: reverse ? target : translation,
       hint,
     },
     {
       id: id + ":order",
       type: "order",
+      label: "句子排列",
       prompt: "把詞語排成正確的句子",
       target,
       translation,
@@ -207,10 +335,33 @@ export function questions(
       hint,
     },
     {
+      id: id + ":listening",
+      type: "choice",
+      label: reverse ? "聽音辨字" : "聽力選擇",
+      audioOnly: true,
+      prompt: reverse
+        ? "聽發音，選出你聽到的單字"
+        : "聽句子，選出正確的中文意思",
+      target: reverse ? word : listening[0],
+      translation: reverse ? meaning : listening[1],
+      answer: reverse ? word : listening[1],
+      options: optionsFor(
+        reverse ? word : listening[1],
+        reverse ? vocabulary.map((v) => v[0]) : entries.map((e) => e[1]),
+        lesson + 2,
+      ),
+      hint: reverse ? `${word}：${meaning}` : listening[3],
+    },
+    {
       id: id + ":speaking",
       type: "speaking",
+      label: lesson % 2 === 0 ? "跟讀練習" : "指定句口說",
       prompt:
-        lesson === 7 ? "模擬對話：試著用這句話回答" : "聽一聽，再跟著說一次",
+        lesson === 7
+          ? "BOSS：完成最後一句口說挑戰"
+          : lesson % 2 === 0
+            ? "聽一聽，再跟著說一次"
+            : "請用外語說出指定的句子",
       target,
       translation,
       hint,
@@ -226,7 +377,15 @@ export type Attempt = {
   xp: number;
   stars: number;
   wrong: string[];
-  mock: true;
+  mock: boolean;
+  curriculumVersion?: 2;
+  oral?: {
+    questionId: string;
+    text: string;
+    source: "browser" | "typed" | "demo";
+    contentCorrect: boolean;
+    pronunciation: null;
+  };
 };
 export type Profile = {
   id: string;
