@@ -1,3 +1,76 @@
+.legacy-note {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: #698468;
+  background: #eff5e9;
+  border-radius: 10px;
+  padding: 12px;
+}
+.oral-practice .oral-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin: 18px 0;
+}
+.speech-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.9;
+  margin-top: 18px;
+  color: #647667;
+}
+.speech-consent input {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  accent-color: #248675;
+}
+.transcript-label {
+  display: block;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 22px;
+}
+.transcript-label textarea {
+  display: block;
+  width: 100%;
+  min-height: 104px;
+  border: 1px solid #cbdaca;
+  border-radius: 12px;
+  background: #fafcf8;
+  font: inherit;
+  font-weight: 400;
+  padding: 14px;
+  margin-top: 10px;
+  resize: vertical;
+  color: #263d36;
+}
+.audio-replay audio {
+  width: 100%;
+  margin-top: 15px;
+}
+.unit-label {
+  font-size: 9px !important;
+  color: #5f8667;
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+.stars {
+  line-height: 1.3;
+}
+.oral-practice .score-grid small {
+  line-height: 1.6;
+}
+.oral-practice .score-grid span {
+  font-size: 10px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
 :root {
   font-family:
     "Noto Sans TC",

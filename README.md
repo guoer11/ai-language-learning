@@ -2,30 +2,44 @@
 
 AI-powered Japanese and English learning web app
 
-## 語言小島 v0.1.0
+## 語言小島 v0.2.0
 
-日文與英文學習 PWA 第一版，以 React + Vite + TypeScript 建立。手機優先，介面預設繁體中文。
+React + Vite + TypeScript + PWA，繁體中文、手機優先的小島學習介面。此版仍使用本機體驗檔案，不是真正的多人登入。
 
-### 本版可操作
+### 課程與練習
 
-- 首頁 → 語言 → 初 / 中 / 高階 → 世界 1 地圖 → 8 個循序關卡。
-- 每關示範 3 題：外語選中文、句子排列、口說模擬。
-- 60% 以上通關；60–79% 1 星、80–99% 2 星、100% 3 星；目前每關 3 題，實際可得到 1 或 3 星，2 星供未來較多題目使用。
-- 每答對 1 題 +10 XP，過關額外 +20 XP。每次新練習都可獲得 XP；星星保留各關最佳值，不重複累加。未過關不解鎖。
-- XP、最佳星星、台灣日期連續天數、成就、今日任務徽章、錯題關卡複習、最近練習紀錄。
-- 自由新增與切換本機體驗檔案、各自保存進度；無愛心、體力、每日練習次數上限。
-- PWA manifest、PNG icons、Service Worker，首次完整載入後可離線體驗靜態課程。
-- Safari 分享 → 加入主畫面；Chrome / Edge 瀏覽器選單安裝。實機安裝仍需驗證。
+- 日文／英文 × 初階／中階／高階。每條路線 1 個世界、2 個單元、8 個關卡，各關 5 題，共 48 關、240 個題目實例。
+- src/data.ts 的 course() 建立語言 → 程度 → 世界 → 單元 → 關卡；questions() 提供關卡題目。48 個關卡有不同的主要句子，題目會在同課複習同一句，不代表 240 句完全不同教材。
+- 單字選擇、外語選中文、中文選外語、句子排列、聽力選擇、聽音辨字、跟讀與指定句口說。
+- 聽力題預設不顯示文字，可重播；裝置無法播放時可選文字提示，不阻擋繼續練習。語音使用裝置 speechSynthesis，聲音品質／可用性依裝置而異。
+- Checkpoint 與 BOSS 包含其他關卡的聽力複習。BOSS 目前是綜合題組，不是自然語言 AI 多輪對話。
+- 5 題中答對 3 題為 60% / 1 星、4 題為 80% / 2 星、全對為 100% / 3 星。低於 60% 不解鎖。
+- 每題答對 +10 XP，過關額外 +20 XP；最佳星星不重複累加。重玩可繼續累積 XP，沒有體力或每日練習上限。
+- 各體驗檔案的 XP、星星、連續天數、每日任務徽章、成就、錯題關卡複習和最近紀錄。
+- 舊版 localStorage learning-demo-v1 不清除：保留 XP、歷史、星星與解鎖，並標示舊版紀錄；新紀錄加 curriculumVersion:2。舊版已解鎖關卡可重新練習新題目。
+- PWA 安裝、靜態課程離線快取、可選擇套用新版本的提示。更新不會在答題途中強制重載。
 
-### 清楚區分模擬與正式能力
+### 口說：內容比對與發音評估分開
 
-本版沒有 Google Login、Supabase 寫入、真實錄音、ASR、OpenAI、Azure 或自然語言 AI BOSS。口說按鈕不會啟動麥克風；使用者選擇模擬辨識結果，內容比對和固定發音示意分數分開顯示。朗讀使用裝置 speechSynthesis，可用聲音與品質取決於裝置；播放失敗時可繼續模擬流程。
+1. 瀏覽器支援時，勾選說明並按「開始語音辨識」，可實際辨識麥克風語音。未勾選不啟動。
+2. 聲音可能由瀏覽器送至其服務商處理，並非保證裝置端辨識或離線可用。APP 不將音訊存到 Supabase。
+3. 「錄音回放」另使用 MediaRecorder，只暫存於此頁，可播放、刪除；每段最多 60 秒，可無限重錄。結束、離開關卡或切到背景會停止麥克風；離開／刪除時釋放 Blob URL。錄音本身不自動評分。
+4. 權限遭拒、不支援辨識或服務連線失敗，可用文字輸入完成內容練習。
+5. 內容比對忽略標點、空白、大小寫及平假名／片假名差異，但不做語意理解，也不保證辨識錯字等於使用者說錯。
+6. Accuracy / Fluency / Completeness / 總分顯示「尚未評估」，不使用固定假分數冒充真實評估。
+7. 紀錄只保存文字、來源（browser / typed / demo）、內容結果、題目 ID；發音分數為 null。填入示範答案會明確標記，不能當成正式口說成績。
 
-BOSS / Checkpoint 目前沿用綜合示範題組，非真正 AI 對話。題庫為每語言、程度 3 組素材循環組成 8 關，用於確認操作流程，並非完整教學教材。其他題型與完整課程將於後續階段補齊。
+Web Speech 相容性與服務端處理說明：[MDN SpeechRecognition](https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition)。錄音：[MDN MediaRecorder](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder)。
 
-本機體驗檔案不是身分驗證或隱私保護；相同瀏覽器可切換所有檔案。清除瀏覽器資料會遺失進度，不跨裝置同步。模擬成績不代表真實能力，不能直接轉入正式成績。
+### 尚未完成，不能當成已有
+
+Google Login、Supabase 雲端進度與 RLS、OpenAI 多輪 AI 對話、Azure 發音評估、完整多年級教材與更多世界。現有本機檔案沒有帳號安全隔離，同瀏覽器可切換他人檔案；清除瀏覽器資料會遺失進度。
+
+[共用後端設計與待確認事項](docs/backend-design.md)。現有 ai-translator 的表格、Auth、Functions、Secrets 均未因本版修改。完整 Auth redirect allowlist / Secrets metadata 仍需確認，才能安全串接 Google 登入與後端。
 
 ### 開發與驗證
+
+Node.js 24，套件固定版本並提交 package-lock.json。
 
 ```sh
 npm ci
@@ -35,14 +49,10 @@ npx playwright install chromium
 npm test
 ```
 
-Node.js 24；commit package-lock.json。`npm test` 會啟動 production preview，自動驗證手機 / 桌面過關解鎖、失敗、弱點複習、家人檔案、重玩星星、重新載入保存、英文高階路徑、PWA 離線與手機橫向溢出。Playwright Chromium mobile emulation 不等同 iOS Safari 實機。
+Playwright 有手機／桌面案例，涵蓋課程唯一性、五題流程、星星分級、獨立檔案、舊紀錄相容、權限拒絕、辨識文字、錄音資源清理與 PWA 離線。語音測試使用瀏覽器 API 替身驗證生命週期，不代表已在 iPhone 真實測過辨識或錄音品質。詳細見 [驗證紀錄](docs/validation.md)。
 
-### GitHub Pages
+### 部署
 
-`vite.config.ts` base 固定 `/ai-language-learning/`，採用同頁 React state 流程，沒有子路由重新整理 404 問題。
+GitHub Pages：`https://guoer11.github.io/ai-language-learning/`。
 
-`.github/workflows/deploy.yml`：main push → npm ci → production build → browser tests → upload pages artifact → deploy。Repository Settings → Pages → Source 需選 GitHub Actions；若尚未開啟，deploy 會失敗，需由有 repository 管理權限的帳號啟用。網站預計網址：`https://guoer11.github.io/ai-language-learning/`，須以實際 workflow deploy 成功為準。
-
-### 後端
-
-詳見 [共用後端檢查與資料庫設計](docs/backend-design.md)。本版完全不修改現有 ai-translator，也不建立新 Supabase Project。無 API Key、Secret 或個人帳號資料放入前端。
+PR 執行建置／測試；main 通過後部署，Vite base 為 /ai-language-learning/。Pages Source 必須選 GitHub Actions。v0.1.0 已安裝者若仍看到舊版，先關閉所有此 APP 分頁及主畫面視窗後重開，不需要清除學習資料。
