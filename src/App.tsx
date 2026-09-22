@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import OralPractice, { type OralResult } from "./OralPractice";
 import {
@@ -49,8 +49,33 @@ type Screen =
   | "review"
   | "stats"
   | "profiles";
-export default function App() {
-  const [save, setSave] = useState(readSave);
+export default function App({
+  account,
+  accountPanel,
+}: {
+  account?: { id: string; name: string };
+  accountPanel?: ReactNode;
+}) {
+  const storageKey = account
+    ? `learning-account-v1:${account.id}`
+    : "learning-demo-v1";
+  const [save, setSave] = useState(() => {
+    const saved = readSave(storageKey);
+    if (!account) return saved;
+    const profile = saved.profiles.find((p) => p.id === account.id);
+    return {
+      version: 1 as const,
+      active: account.id,
+      profiles: [
+        profile || {
+          id: account.id,
+          name: account.name,
+          avatar: "🌱",
+          attempts: [],
+        },
+      ],
+    };
+  });
   const [screen, setScreen] = useState<Screen>("home");
   const [language, setLanguage] = useState<Language>("ja");
   const [level, setLevel] = useState<Level>("beginner");
@@ -94,11 +119,11 @@ export default function App() {
   ).reduce((a, b) => a + b, 0);
   useEffect(() => {
     try {
-      localStorage.setItem("learning-demo-v1", JSON.stringify(save));
+      localStorage.setItem(storageKey, JSON.stringify(save));
     } catch {
       setNotice("此瀏覽器無法儲存進度，關閉後可能遺失。");
     }
-  }, [save]);
+  }, [save, storageKey]);
   useEffect(() => {
     window.scrollTo(0, 0);
     window.speechSynthesis?.cancel();
@@ -262,7 +287,9 @@ export default function App() {
           <span className="avatar">{profile.avatar}</span>
           <span>
             {profile.name}
-            <small>本機體驗檔案 · 切換</small>
+            <small>
+              {account ? "Google 帳號 · 管理" : "本機體驗檔案 · 切換"}
+            </small>
           </span>
           <ChevronRight size={16} />
         </button>
@@ -303,7 +330,9 @@ export default function App() {
           <div className="demo-bar">
             <span>
               <span className="status-dot" />
-              學習體驗版 · 進度存於此瀏覽器，發音評估尚未啟用
+              {account
+                ? "已登入 · 進度暫存本機，尚未雲端同步"
+                : "訪客模式 · 進度存於此瀏覽器"}
             </span>
             <button onClick={() => setInstall(true)}>
               <Download size={14} />
@@ -333,6 +362,7 @@ export default function App() {
               {notice}
             </div>
           )}
+          {(screen === "home" || screen === "profiles") && accountPanel}
           {screen === "home" && (
             <>
               <section className="hero">
@@ -998,7 +1028,9 @@ export default function App() {
               <div className="page-title">
                 <h1>今天是誰來冒險？</h1>
                 <p>
-                  本機體驗檔案各自保留進度。這不是登入；同一瀏覽器的人可以互相切換。
+                  {account
+                    ? "這是目前 Google 帳號的學習檔案，進度暫存於此瀏覽器。"
+                    : "本機體驗檔案各自保留進度。這不是登入；同一瀏覽器的人可以互相切換。"}
                 </p>
               </div>
               <div className="profile-grid">
@@ -1023,51 +1055,55 @@ export default function App() {
                   </button>
                 ))}
               </div>
-              <form
-                className="panel new-profile"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (!name.trim()) return;
-                  const id = crypto.randomUUID();
-                  setSave((s) => ({
-                    ...s,
-                    active: id,
-                    profiles: [
-                      ...s.profiles,
-                      {
-                        id,
-                        name: name.trim().slice(0, 20),
-                        avatar: ["🐻", "🐱", "🦊", "🐼"][s.profiles.length % 4],
-                        attempts: [],
-                      },
-                    ],
-                  }));
-                  setName("");
-                  go("home");
-                }}
-              >
-                <label htmlFor="profile-name">新增體驗檔案</label>
-                <input
-                  id="profile-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  maxLength={20}
-                  placeholder="輸入暱稱"
-                  required
-                />
-                <button className="primary">
-                  <Plus size={17} />
-                  新增
-                </button>
-              </form>
+              {!account && (
+                <form
+                  className="panel new-profile"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!name.trim()) return;
+                    const id = crypto.randomUUID();
+                    setSave((s) => ({
+                      ...s,
+                      active: id,
+                      profiles: [
+                        ...s.profiles,
+                        {
+                          id,
+                          name: name.trim().slice(0, 20),
+                          avatar: ["🐻", "🐱", "🦊", "🐼"][
+                            s.profiles.length % 4
+                          ],
+                          attempts: [],
+                        },
+                      ],
+                    }));
+                    setName("");
+                    go("home");
+                  }}
+                >
+                  <label htmlFor="profile-name">新增體驗檔案</label>
+                  <input
+                    id="profile-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    maxLength={20}
+                    placeholder="輸入暱稱"
+                    required
+                  />
+                  <button className="primary">
+                    <Plus size={17} />
+                    新增
+                  </button>
+                </form>
+              )}
               <p className="center muted">
-                Google 登入與跨裝置同步尚未啟用。清除瀏覽器資料將移除本機進度。
+                跨裝置同步尚未啟用。清除瀏覽器資料將移除本機進度。
               </p>
             </>
           )}
           <footer>
             語言小島 <span>·</span> 一起學習，一起看見更大的世界。
-            <small>v0.2.0 · 學習體驗版</small>
+            <small>v0.3.0 · 學習體驗版</small>
           </footer>
         </main>
         <nav className="mobile-nav">

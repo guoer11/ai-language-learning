@@ -1,5 +1,13 @@
 # 共用後端設計提案（未套用）
 
+## v0.3.0 登入整合
+
+2026-09-22 從最新 main `ba8edcbc818ed88c9ea88e869d1503e1939f492d` 開始。再次確認 public 仍只有三張 translator_ 表且 RLS 開啟。Auth 公開 settings 的 google=true，authorize 會導向 accounts.google.com，Google callback 為既有 Supabase `/auth/v1/callback`。這不證明 APP 回跳網址已列入 allowlist。
+
+使用 `@supabase/supabase-js` 2.116.0，PKCE、獨立 session storageKey、local scope 登出。僅取得可公開的 Publishable Key，沒有讀取 Secret 值、存放音訊或寫入使用者資料表。登入後前端進度以 UUID 分開保存，尚未部署 learning_ 資料表／RLS／雲端同步。不得把本機區隔稱作正式資料庫權限隔離。
+
+Dashboard 的 URL Configuration 目前需要重新登入才能核對。待確認／只新增 `https://guoer11.github.io/ai-language-learning/` 至 Redirect URLs；Site URL、Google Client ID／Secret 及既有 redirect URLs 保持原樣。
+
 ## v0.2.0 更新說明
 
 2026-09-21 再次唯讀確認 public 仍為原有 3 張 translator_ 資料表，realtime-session 仍為 version 23，未修改後端。此版新增瀏覽器語音辨識（使用者先同意，可能由瀏覽器廠商服務處理）、本機錄音回放及手動內容比對，並非 Supabase / OpenAI / Azure 串接。正式發音分數仍為 null。

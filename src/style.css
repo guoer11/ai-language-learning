@@ -2374,3 +2374,38 @@ footer small {
     scroll-behavior: auto !important;
   }
 }
+.account-panel {
+  margin-bottom: 24px;
+  padding: 22px;
+}
+.account-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.account-heading strong {
+  font-size: 1.12rem;
+}
+.account-heading p {
+  margin: 5px 0;
+  overflow-wrap: anywhere;
+}
+.account-panel > p {
+  line-height: 1.7;
+  font-size: 0.9rem;
+}
+.account-panel button {
+  min-height: 48px;
+}
+.account-error {
+  color: #9b3434;
+  background: #fff1ed;
+  padding: 12px;
+  border-radius: 12px;
+}
+.auth-loading {
+  min-height: 65vh;
+  display: grid;
+  place-items: center;
+  color: #218675;
+}
