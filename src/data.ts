@@ -424,9 +424,9 @@ export function streak(profile: Profile) {
   }
   return count;
 }
-export function readSave(): Save {
+export function readSave(storageKey = "learning-demo-v1"): Save {
   try {
-    const s = JSON.parse(localStorage.getItem("learning-demo-v1") || "null");
+    const s = JSON.parse(localStorage.getItem(storageKey) || "null");
     if (
       s?.version === 1 &&
       Array.isArray(s.profiles) &&

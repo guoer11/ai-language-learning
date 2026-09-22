@@ -1,6 +1,6 @@
 {
   "name": "ai-language-learning",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "AI-powered Japanese and English learning web app",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -21,6 +21,7 @@
   },
   "homepage": "https://github.com/guoer11/ai-language-learning#readme",
   "dependencies": {
+    "@supabase/supabase-js": "2.116.0",
     "lucide-react": "1.47.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"

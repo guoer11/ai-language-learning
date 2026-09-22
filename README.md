@@ -2,9 +2,20 @@
 
 AI-powered Japanese and English learning web app
 
-## 語言小島 v0.2.0
+## 語言小島 v0.3.0
 
-React + Vite + TypeScript + PWA，繁體中文、手機優先的小島學習介面。此版仍使用本機體驗檔案，不是真正的多人登入。
+React + Vite + TypeScript + PWA，繁體中文、手機優先的小島學習介面。新增 Supabase Google 登入程式；正式啟用前須確認下方回跳網址設定。學習進度仍存在本機，尚無雲端同步。
+
+### Google 登入
+
+- 共用 ai-translator 的 Supabase Auth；前端只使用 Publishable Key。沒有建立新 Supabase Project 或修改翻譯資料表／Functions／Secrets。
+- PKCE 登入回到 APP 根路徑，適用 GitHub Pages；一次性交換 code 後清除網址參數，取消／過期／網路錯誤顯示繁體中文提示。
+- 登入狀態使用 `learning-auth-v1`，不沿用翻譯 APP 的預設 session key。登出使用 `scope: local`，不全域登出同帳號其他 session。
+- 訪客使用原本 `learning-demo-v1`；登入帳號使用 `learning-account-v1:<auth.users UUID>`。不自動移轉訪客或家人的紀錄；切換帳號重建練習畫面，避免進度串帳。
+- 本機資料不是 RLS／雲端安全儲存。能操作同一個瀏覽器儲存空間的人仍可能讀取資料；清除瀏覽器會遺失進度。Google 驗證不代表已備份進度。
+- Auth callback 與隔離測試使用合成 session／攔截 API，不代表真人 Google 授權已完成。
+
+設定：Supabase → Authentication → URL Configuration → Redirect URLs 應包含 **`https://guoer11.github.io/ai-language-learning/`**（含結尾斜線）。只能新增此條目，保留既有 Site URL、所有 redirect URLs 與 Google provider 設定。Google OAuth 原本使用的 Supabase callback 不需替換。若 Google 專案仍為 Testing，家人的 Google 帳號也需要在 Google Auth Platform 的測試使用者名單。
 
 ### 課程與練習
 
@@ -33,7 +44,7 @@ Web Speech 相容性與服務端處理說明：[MDN SpeechRecognition](https://d
 
 ### 尚未完成，不能當成已有
 
-Google Login、Supabase 雲端進度與 RLS、OpenAI 多輪 AI 對話、Azure 發音評估、完整多年級教材與更多世界。現有本機檔案沒有帳號安全隔離，同瀏覽器可切換他人檔案；清除瀏覽器資料會遺失進度。
+Supabase 雲端進度與 RLS、OpenAI 多輪 AI 對話、Azure 發音評估、完整多年級教材與更多世界。訪客體驗檔案可直接切換；登入帳號的本機區隔也不等於雲端 RLS。
 
 [共用後端設計與待確認事項](docs/backend-design.md)。現有 ai-translator 的表格、Auth、Functions、Secrets 均未因本版修改。完整 Auth redirect allowlist / Secrets metadata 仍需確認，才能安全串接 Google 登入與後端。
 
