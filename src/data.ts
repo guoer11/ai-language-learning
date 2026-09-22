@@ -349,7 +349,11 @@ export function questions(
       prompt: "把詞語排成正確的句子",
       target: arranging[0],
       translation: arranging[1],
-      tokens: language === "ja" ? japaneseTokens[arranging[0]] : arranging[2],
+      // English tiles are words; keep contractions, hyphens and punctuation intact.
+      tokens:
+        language === "ja"
+          ? japaneseTokens[arranging[0]]
+          : arranging[0].trim().split(/\s+/),
       hint: arranging[3],
       studyText: arranging[0],
       explanation: explanations[language][level][orderIndex],
