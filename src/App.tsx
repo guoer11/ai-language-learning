@@ -52,9 +52,11 @@ type Screen =
 export default function App({
   account,
   accountPanel,
+  accountError,
 }: {
   account?: { id: string; name: string };
   accountPanel?: ReactNode;
+  accountError?: string;
 }) {
   const storageKey = account
     ? `learning-account-v1:${account.id}`
@@ -304,7 +306,7 @@ export default function App({
               : screen === "levels"
                 ? "選擇程度"
                 : screen === "profiles"
-                  ? "體驗檔案"
+                  ? "帳號與學習檔案"
                   : meta.name + "冒險"}
           </span>
           <div className="top-stats">
@@ -320,7 +322,8 @@ export default function App({
             <button
               className="tiny-avatar"
               onClick={() => go("profiles")}
-              aria-label="切換體驗檔案"
+              aria-label="帳號與登入"
+              title={account ? "管理帳號與登出" : "Google 登入與體驗檔案"}
             >
               {profile.avatar}
             </button>
@@ -362,7 +365,12 @@ export default function App({
               {notice}
             </div>
           )}
-          {(screen === "home" || screen === "profiles") && accountPanel}
+          {accountError && (
+            <p className="account-error" role="alert">
+              {accountError}
+            </p>
+          )}
+          {screen === "profiles" && accountPanel}
           {screen === "home" && (
             <>
               <section className="hero">
@@ -1103,7 +1111,7 @@ export default function App({
           )}
           <footer>
             語言小島 <span>·</span> 一起學習，一起看見更大的世界。
-            <small>v0.3.0 · 學習體驗版</small>
+            <small>v0.3.1 · 學習體驗版</small>
           </footer>
         </main>
         <nav className="mobile-nav">

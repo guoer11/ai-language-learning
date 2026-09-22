@@ -152,7 +152,7 @@ test("complete flow, unlock, persistence and independent profiles", async ({
   ).toBeDisabled();
   await page.reload();
   await expect(page.getByText("⚡ 70 XP", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "切換體驗檔案", exact: true }).click();
+  await page.getByRole("button", { name: "帳號與登入", exact: true }).click();
   await page.getByLabel("新增體驗檔案").fill("家人二號");
   await page.getByRole("button", { name: "新增", exact: true }).click();
   await expect(page.getByText("⚡ 0 XP", { exact: true })).toBeVisible();

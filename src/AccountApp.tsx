@@ -109,11 +109,6 @@ export default function AccountApp() {
         {user ? <LogOut size={18} /> : <LogIn size={18} />}
         {busy ? "處理中…" : user ? "登出這個帳號" : "使用 Google 登入"}
       </button>
-      {error && (
-        <p className="account-error" role="alert">
-          {error}
-        </p>
-      )}
       {user && (
         <p className="muted">
           換家人使用時，請先登出，再登入另一個 Google
@@ -133,6 +128,7 @@ export default function AccountApp() {
       key={user?.id || "guest"}
       account={user ? { id: user.id, name: displayName } : undefined}
       accountPanel={accountPanel}
+      accountError={error}
     />
   );
 }
