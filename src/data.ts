@@ -1,4 +1,6 @@
 import { extra, words } from "./extra-lessons";
+import { japaneseTokens } from "./japanese";
+import { explanations } from "./explanations";
 export type Language = "ja" | "en";
 export type Level = "beginner" | "intermediate" | "advanced";
 export type Question = {
@@ -11,6 +13,10 @@ export type Question = {
   answer?: string;
   tokens?: string[];
   hint: string;
+  studyText: string;
+  explanation: string;
+  optionsForeign?: boolean;
+  optionMeanings?: Record<string, string>;
   label?: string;
   audioOnly?: boolean;
   alternatives?: string[];
@@ -287,12 +293,18 @@ export function questions(
 ): Question[] {
   const entries = [...corpus[language][level], ...extra[language][level]];
   const entry = entries[lesson];
-  const [target, translation, tokens, hint] = entry;
+  const [target, translation, , hint] = entry;
   const id = `${pathKey(language, level)}:${lesson}`;
   const vocabulary = words[language][level];
   const [word, meaning] = vocabulary[lesson];
   const reverse = lesson % 2 === 1;
-  const listening = entries[lesson === 3 ? 1 : lesson === 7 ? 6 : lesson];
+  const orderIndex = (lesson + 1) % entries.length;
+  const listenIndex = (lesson + 2) % entries.length;
+  const speakingIndex = (lesson + 3) % entries.length;
+  const arranging = entries[orderIndex];
+  const listening = entries[listenIndex];
+  const speaking = entries[speakingIndex];
+  const [listenWord, listenMeaning] = vocabulary[listenIndex];
   return [
     {
       id: id + ":vocabulary",
@@ -307,7 +319,9 @@ export function questions(
         vocabulary.map((v) => v[1]),
         lesson,
       ),
-      hint: `${word}：${meaning}`,
+      hint: `「${word}」：${meaning}`,
+      studyText: word,
+      explanation: `這題要辨認單字的意思。「${word}」對應「${meaning}」。請先記住這組詞義，再分辨其他選項。`,
     },
     {
       id: id + ":choice",
@@ -323,16 +337,22 @@ export function questions(
       ),
       answer: reverse ? target : translation,
       hint,
+      studyText: target,
+      explanation: explanations[language][level][lesson],
+      optionsForeign: reverse,
+      optionMeanings: Object.fromEntries(entries.map((e) => [e[0], e[1]])),
     },
     {
       id: id + ":order",
       type: "order",
       label: "句子排列",
       prompt: "把詞語排成正確的句子",
-      target,
-      translation,
-      tokens,
-      hint,
+      target: arranging[0],
+      translation: arranging[1],
+      tokens: language === "ja" ? japaneseTokens[arranging[0]] : arranging[2],
+      hint: arranging[3],
+      studyText: arranging[0],
+      explanation: explanations[language][level][orderIndex],
     },
     {
       id: id + ":listening",
@@ -342,15 +362,21 @@ export function questions(
       prompt: reverse
         ? "聽發音，選出你聽到的單字"
         : "聽句子，選出正確的中文意思",
-      target: reverse ? word : listening[0],
-      translation: reverse ? meaning : listening[1],
-      answer: reverse ? word : listening[1],
+      target: reverse ? listenWord : listening[0],
+      translation: reverse ? listenMeaning : listening[1],
+      answer: reverse ? listenWord : listening[1],
       options: optionsFor(
-        reverse ? word : listening[1],
+        reverse ? listenWord : listening[1],
         reverse ? vocabulary.map((v) => v[0]) : entries.map((e) => e[1]),
         lesson + 2,
       ),
-      hint: reverse ? `${word}：${meaning}` : listening[3],
+      hint: reverse ? `「${listenWord}」：${listenMeaning}` : listening[3],
+      studyText: reverse ? listenWord : listening[0],
+      explanation: reverse
+        ? `聽到的單字是「${listenWord}」，意思是「${listenMeaning}」。可以對照假名或字母，再播放一次確認聲音。`
+        : explanations[language][level][listenIndex],
+      optionsForeign: reverse,
+      optionMeanings: Object.fromEntries(vocabulary),
     },
     {
       id: id + ":speaking",
@@ -362,9 +388,11 @@ export function questions(
           : lesson % 2 === 0
             ? "聽一聽，再跟著說一次"
             : "請用外語說出指定的句子",
-      target,
-      translation,
-      hint,
+      target: speaking[0],
+      translation: speaking[1],
+      hint: speaking[3],
+      studyText: speaking[0],
+      explanation: explanations[language][level][speakingIndex],
     },
   ];
 }
@@ -378,7 +406,7 @@ export type Attempt = {
   stars: number;
   wrong: string[];
   mock: boolean;
-  curriculumVersion?: 2;
+  curriculumVersion?: 2 | 3;
   oral?: {
     questionId: string;
     text: string;

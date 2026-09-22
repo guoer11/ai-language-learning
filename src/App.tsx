@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useRef, type ReactNode } from "react";
+import { JapaneseText, StudyHint } from "./japanese";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import OralPractice, { type OralResult } from "./OralPractice";
 import {
@@ -86,6 +87,8 @@ export default function App({
   const [answer, setAnswer] = useState("");
   const [order, setOrder] = useState<number[]>([]);
   const [checked, setChecked] = useState(false);
+  const [countdown, setCountdown] = useState(3);
+  const nextRef = useRef<() => void>(() => {});
   const [correct, setCorrect] = useState(0);
   const [wrong, setWrong] = useState<string[]>([]);
   const [oral, setOral] = useState<OralResult | null>(null);
@@ -182,6 +185,7 @@ export default function App({
   function check() {
     if (checked) return;
     setChecked(true);
+    setCountdown(3);
     if (isCorrect) setCorrect((v) => v + 1);
     else setWrong((w) => [...w, q.id]);
   }
@@ -208,7 +212,7 @@ export default function App({
       stars,
       wrong,
       mock: oral?.source === "demo",
-      curriculumVersion: 2,
+      curriculumVersion: 3,
       oral: oral ? { questionId: q.id, ...oral } : undefined,
     };
     setSave((s) => ({
@@ -220,6 +224,19 @@ export default function App({
     setResult(record);
     go("result");
   }
+  nextRef.current = next;
+  useEffect(() => {
+    if (screen !== "lesson" || !checked || !isCorrect) return;
+    const ticker = window.setInterval(
+      () => setCountdown((n) => Math.max(0, n - 1)),
+      1000,
+    );
+    const timer = window.setTimeout(() => nextRef.current(), 3000);
+    return () => {
+      window.clearInterval(ticker);
+      window.clearTimeout(timer);
+    };
+  }, [screen, checked, isCorrect, q.id]);
   const completed = lessonNames.filter(
     (_, i) => bestStars(profile, path, i) > 0,
   ).length;
@@ -571,7 +588,7 @@ export default function App({
               </section>
               <div className="map-layout">
                 {profile.attempts.some(
-                  (a) => a.path === path && a.curriculumVersion !== 2,
+                  (a) => a.path === path && a.curriculumVersion !== 3,
                 ) && (
                   <p className="legacy-note">
                     已保留舊版的星星與解鎖進度；這次新增的題目，可以重玩關卡補練。
@@ -712,9 +729,14 @@ export default function App({
                     <Volume2 />
                   </button>
                   <div lang={q.label === "中文選外語" ? "zh-Hant" : language}>
-                    {!q.audioOnly || checked || showAudioText
-                      ? q.target
-                      : "先聽聲音，再選答案"}
+                    {!q.audioOnly || checked || showAudioText ? (
+                      <JapaneseText
+                        text={q.target}
+                        enabled={language === "ja" && q.label !== "中文選外語"}
+                      />
+                    ) : (
+                      "先聽聲音，再選答案"
+                    )}
                   </div>
                   {q.audioOnly && !checked && (
                     <button
@@ -740,10 +762,14 @@ export default function App({
                         (checked && o === q.answer ? " correct" : "")
                       }
                       key={o}
+                      aria-label={`${i + 1} ${o}`}
                       onClick={() => setAnswer(o)}
                     >
                       <span>{i + 1}</span>
-                      {o}
+                      <JapaneseText
+                        text={o}
+                        enabled={language === "ja" && !!q.optionsForeign}
+                      />
                       {answer === o && <Check size={18} />}
                     </button>
                   ))}
@@ -757,11 +783,16 @@ export default function App({
                         <button
                           disabled={checked}
                           key={idx}
+                          aria-label={q.tokens![idx]}
                           onClick={() =>
                             setOrder(order.filter((_, i) => i !== j))
                           }
                         >
-                          {q.tokens![idx]}
+                          <JapaneseText
+                            text={q.tokens![idx]}
+                            enabled={language === "ja"}
+                            context={q.target}
+                          />
                         </button>
                       ))
                     ) : (
@@ -774,10 +805,15 @@ export default function App({
                       .map((idx) => (
                         <button
                           key={idx}
+                          aria-label={q.tokens![idx]}
                           disabled={checked || order.includes(idx)}
                           onClick={() => setOrder([...order, idx])}
                         >
-                          {q.tokens![idx]}
+                          <JapaneseText
+                            text={q.tokens![idx]}
+                            enabled={language === "ja"}
+                            context={q.target}
+                          />
                         </button>
                       ))}
                   </div>
@@ -810,9 +846,63 @@ export default function App({
                       : "再練一次就會更熟悉！"}
                   </strong>
                   {!isCorrect && (
-                    <p>參考答案：{q.type === "choice" ? q.answer : q.target}</p>
+                    <div className="answer-explanation">
+                      <p>
+                        <b>你的答案：</b>
+                        <JapaneseText
+                          text={
+                            q.type === "choice"
+                              ? answer
+                              : q.type === "order"
+                                ? order
+                                    .map((i) => q.tokens![i])
+                                    .join(language === "ja" ? "" : " ")
+                                : oral?.text || "未作答"
+                          }
+                          enabled={
+                            language === "ja" &&
+                            (q.type !== "choice" || !!q.optionsForeign)
+                          }
+                        />
+                      </p>
+                      {q.type === "choice" &&
+                        q.optionsForeign &&
+                        q.optionMeanings?.[answer] && (
+                          <p>你選的意思：{q.optionMeanings[answer]}</p>
+                        )}
+                      <p>
+                        <b>正確答案：</b>
+                        <JapaneseText
+                          text={q.type === "choice" ? q.answer! : q.target}
+                          enabled={
+                            language === "ja" &&
+                            (q.type !== "choice" || !!q.optionsForeign)
+                          }
+                        />
+                      </p>
+                      <p>
+                        <b>題目與意思：</b>
+                        <JapaneseText
+                          text={q.studyText}
+                          enabled={language === "ja"}
+                        />{" "}
+                        — {q.translation}
+                      </p>
+                      <p>
+                        <b>為什麼這樣回答：</b>
+                        <StudyHint
+                          text={q.explanation}
+                          japanese={language === "ja"}
+                        />
+                      </p>
+                      <p>看懂解析後再按下一題，可以慢慢讀。</p>
+                    </div>
                   )}
-                  <p>{q.hint}</p>
+                  {isCorrect && (
+                    <p>
+                      <StudyHint text={q.hint} japanese={language === "ja"} />
+                    </p>
+                  )}
                 </div>
               )}
               <div className="lesson-actions">
@@ -821,7 +911,12 @@ export default function App({
                     ? "每次嘗試，都是累積。"
                     : "不需要完美，只需要開始。"}
                 </span>
-                {checked ? (
+                {checked && isCorrect ? (
+                  <span className="auto-next">
+                    {countdown} 秒後自動
+                    {qi === qs.length - 1 ? "顯示學習成果" : "前往下一題"}
+                  </span>
+                ) : checked ? (
                   <button className="primary" onClick={next}>
                     {qi === qs.length - 1 ? "查看學習成果" : "下一題"}
                     <ChevronRight size={18} />
@@ -1008,7 +1103,7 @@ export default function App({
                           {lessonTitle(a.path.split(":")[1] as Level, a.lesson)}
                           <small>
                             {a.date} ·{" "}
-                            {a.curriculumVersion === 2
+                            {!!a.curriculumVersion
                               ? a.oral?.source === "browser"
                                 ? "瀏覽器辨識"
                                 : a.oral?.source === "demo"
@@ -1111,7 +1206,7 @@ export default function App({
           )}
           <footer>
             語言小島 <span>·</span> 一起學習，一起看見更大的世界。
-            <small>v0.3.1 · 學習體驗版</small>
+            <small>v0.4.0 · 學習體驗版</small>
           </footer>
         </main>
         <nav className="mobile-nav">

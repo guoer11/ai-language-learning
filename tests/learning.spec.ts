@@ -6,7 +6,11 @@ import {
   type Language,
   type Level,
 } from "../src/data";
+import { readingParts, japaneseTokens } from "../src/japanese";
 import { compareContent } from "../src/OralPractice";
+test.beforeEach(async ({ page }) => {
+  await page.clock.install();
+});
 async function enter(
   page: Page,
   language: Language = "ja",
@@ -70,6 +74,8 @@ async function answerQuestion(
       await page
         .locator(".word-bank")
         .getByRole("button", { name: token, exact: true })
+        .and(page.locator("button:not(:disabled)"))
+        .first()
         .click();
   } else {
     await page
@@ -79,12 +85,19 @@ async function answerQuestion(
     await expect(page.getByText("尚未評估", { exact: true })).toHaveCount(4);
   }
   await page.getByRole("button", { name: "確認答案" }).click();
-  await page
-    .getByRole("button", {
-      name: q.type === "speaking" ? "查看學習成果" : "下一題",
-      exact: true,
-    })
-    .click();
+  if (correct) {
+    await page.clock.fastForward(3000);
+  } else {
+    await expect(page.locator(".answer-explanation")).toContainText(
+      "為什麼這樣回答",
+    );
+    await page
+      .getByRole("button", {
+        name: q.type === "speaking" ? "查看學習成果" : "下一題",
+        exact: true,
+      })
+      .click();
+  }
 }
 async function finish(
   page: Page,
@@ -108,6 +121,27 @@ test("course has 48 distinct lessons, hierarchy and all score bands", () => {
       for (const lesson of c.worlds[0].units.flatMap((u) => u.lessons)) {
         const qs = questions(l, v, lesson.index);
         expect(qs).toHaveLength(5);
+        expect(
+          new Set([
+            qs[1].studyText,
+            qs[2].studyText,
+            qs[3].studyText,
+            qs[4].studyText,
+          ]).size,
+        ).toBe(4);
+        if (l === "ja") {
+          expect(qs[2].tokens!.join("")).toBe(qs[2].target);
+          for (const text of qs.flatMap((q) => [
+            q.studyText,
+            ...(q.optionsForeign ? q.options! : []),
+          ])) {
+            expect(
+              readingParts(text).filter(
+                (p) => !p.reading && /\p{Script=Han}/u.test(p.text),
+              ),
+            ).toEqual([]);
+          }
+        }
         targets.add(qs[4].target);
         for (const q of qs) {
           expect(ids.has(q.id)).toBe(false);
@@ -132,6 +166,60 @@ test("course has 48 distinct lessons, hierarchy and all score bands", () => {
   ).toBe(true);
   expect(compareContent("こんにちは。", "こんにちは")).toBe(true);
 });
+test("correct answer waits three seconds, wrong answer stays, exit cancels pending advance", async ({
+  page,
+}) => {
+  await enter(page, "ja", "intermediate");
+  const qs = questions("ja", "intermediate", 0);
+  await expect(page.locator(".target rt")).toHaveText(["まど"]);
+  await page
+    .getByRole("button", {
+      name: `${qs[0].options!.indexOf(qs[0].answer!) + 1} ${qs[0].answer}`,
+      exact: true,
+    })
+    .click();
+  await page.getByRole("button", { name: "確認答案" }).click();
+  await page.clock.runFor(2000);
+  await expect(page.locator(".lesson-top")).toContainText("1 / 5");
+  await page.clock.runFor(1000);
+  await expect(page.locator(".lesson-top")).toContainText("2 / 5");
+  const wrong = qs[1].options!.find((o) => o !== qs[1].answer)!;
+  await page
+    .getByRole("button", {
+      name: `${qs[1].options!.indexOf(wrong) + 1} ${wrong}`,
+      exact: true,
+    })
+    .click();
+  await page.getByRole("button", { name: "確認答案" }).click();
+  await expect(page.locator(".answer-explanation")).toContainText("徵求許可");
+  await expect(page.locator(".answer-explanation rt")).not.toHaveCount(0);
+  await page.clock.fastForward(10000);
+  await expect(page.locator(".lesson-top")).toContainText("2 / 5");
+  await page.getByRole("button", { name: "下一題", exact: true }).click();
+  expect(qs[2].tokens).toEqual([
+    "予約",
+    "を",
+    "変更",
+    "したい",
+    "の",
+    "です",
+    "が",
+    "。",
+  ]);
+  for (const token of qs[2].tokens!)
+    await page
+      .locator(".word-bank")
+      .getByRole("button", { name: token, exact: true })
+      .and(page.locator("button:not(:disabled)"))
+      .first()
+      .click();
+  await page.getByRole("button", { name: "確認答案" }).click();
+  await page.getByRole("button", { name: "離開關卡" }).click();
+  await page.clock.fastForward(5000);
+  await expect(page.locator(".lesson-shell")).toHaveCount(0);
+  await page.getByRole("button", { name: "1 選擇座位", exact: true }).click();
+  await expect(page.locator(".lesson-top")).toContainText("1 / 5");
+});
 test("complete flow, unlock, persistence and independent profiles", async ({
   page,
 }) => {
@@ -142,7 +230,8 @@ test("complete flow, unlock, persistence and independent profiles", async ({
   await expect(page.getByText("+70", { exact: true })).toBeVisible();
   await expect(page.getByText("★★★", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "前往下一關" }).click();
-  await expect(page.getByText("水", { exact: true })).toBeVisible();
+  await expect(page.locator(".target ruby")).toContainText("水");
+  await expect(page.locator(".target rt")).toHaveText(["みず"]);
   await page.getByRole("button", { name: "離開關卡" }).click();
   await expect(
     page.getByRole("button", { name: "2 禮貌與飲水", exact: true }),
@@ -245,7 +334,7 @@ test("old progress retained and new lessons do not overwrite records", async ({
   );
   expect(saved.profiles[0].attempts).toHaveLength(2);
   expect(saved.profiles[0].attempts[0].id).toBe("legacy");
-  expect(saved.profiles[0].attempts[1].curriculumVersion).toBe(2);
+  expect(saved.profiles[0].attempts[1].curriculumVersion).toBe(3);
   expect(saved.profiles[0].attempts[1].oral.source).toBe("typed");
   expect(saved.profiles[0].attempts[1].oral.pronunciation).toBeNull();
 });
@@ -289,7 +378,7 @@ test("browser speech requires consent, transcript evaluated without pronunciatio
       start() {
         setTimeout(() => {
           this.onresult?.({
-            results: [{ isFinal: true, 0: { transcript: "こんにちは。" } }],
+            results: [{ isFinal: true, 0: { transcript: "私は学生です。" } }],
           });
           this.onend?.();
         }, 20);
@@ -311,14 +400,15 @@ test("browser speech requires consent, transcript evaluated without pronunciatio
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "開始語音辨識" }).click();
   await expect(page.getByLabel("辨識文字／手動輸入")).toHaveValue(
-    "こんにちは。",
+    "私は学生です。",
   );
   await page.getByRole("button", { name: "比對內容", exact: true }).click();
   await expect(
     page.getByText("✓ 文字內容符合目標句", { exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "確認答案" }).click();
-  await page.getByRole("button", { name: "查看學習成果" }).click();
+  await page.clock.fastForward(3000);
+  await expect(page.getByText("+70", { exact: true })).toBeVisible();
   const saved = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("learning-demo-v1")!),
   );
