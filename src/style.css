@@ -2409,3 +2409,33 @@ footer small {
   place-items: center;
   color: #218675;
 }
+.japanese-text {
+  line-height: 2.1;
+}
+ruby {
+  ruby-align: center;
+  ruby-position: over;
+}
+rt {
+  font-size: 0.55em;
+  font-weight: 500;
+  color: #526961;
+}
+rp {
+  color: #526961;
+}
+.word-bank button,
+.sentence-slots button {
+  line-height: 2;
+  min-height: 56px;
+}
+.answer-explanation {
+  line-height: 1.9;
+}
+.answer-explanation p {
+  margin: 12px 0;
+}
+.auto-next {
+  color: #177563;
+  font-weight: 700;
+}

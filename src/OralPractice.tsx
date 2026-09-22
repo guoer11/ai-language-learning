@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { JapaneseText, StudyHint } from "./japanese";
 import { Mic, Square, RotateCcw } from "lucide-react";
 import type { Question, Language } from "./data";
 export type OralResult = {
@@ -361,8 +362,14 @@ export default function OralPractice({
           </div>
           {!result.contentCorrect && (
             <>
-              <p>目標：{q.target}</p>
-              <p>你的內容：{result.text}</p>
+              <p>
+                目標：
+                <JapaneseText text={q.target} enabled={language === "ja"} />
+              </p>
+              <p>
+                你的內容：
+                <JapaneseText text={result.text} enabled={language === "ja"} />
+              </p>
             </>
           )}
           <p className="muted">
@@ -382,7 +389,10 @@ export default function OralPractice({
               </div>
             ))}
           </div>
-          <p>練習提示：{q.hint}</p>
+          <p>
+            練習提示：
+            <StudyHint text={q.hint} japanese={language === "ja"} />
+          </p>
         </div>
       )}
     </section>
