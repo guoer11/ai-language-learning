@@ -77,6 +77,10 @@ async function signedIn(page: Page, id = uidA) {
     },
   );
   await page.goto("./");
+  await expect(page.getByRole("region", { name: "Google 帳號" })).toHaveCount(
+    0,
+  );
+  await page.getByRole("button", { name: "帳號與登入" }).click();
   await expect(
     page.getByRole("button", { name: "登出這個帳號" }),
   ).toBeVisible();
@@ -89,6 +93,10 @@ test("Google login uses PKCE, app redirect, account chooser and isolated session
     r.fulfill({ body: "OAuth navigation test" }),
   );
   await page.goto("./");
+  await expect(page.getByRole("region", { name: "Google 帳號" })).toHaveCount(
+    0,
+  );
+  await page.getByRole("button", { name: "帳號與登入" }).click();
   await page.getByRole("button", { name: "使用 Google 登入" }).click();
   await page.waitForURL("**/auth/v1/authorize?**");
   const url = new URL(page.url());
@@ -118,12 +126,14 @@ test("callback exchanges code once and restores signed-in account on reload", as
   });
   await page.route(`${api}/user`, (r) => r.fulfill({ json: user() }));
   await page.goto("./?code=test-code");
+  await page.getByRole("button", { name: "帳號與登入" }).click();
   await expect(
     page.getByText("測試甲，歡迎回來", { exact: true }),
   ).toBeVisible();
   expect(page.url()).not.toContain("code=");
   expect(exchanges).toBe(1);
   await page.reload();
+  await page.getByRole("button", { name: "帳號與登入" }).click();
   await expect(
     page.getByText("測試甲，歡迎回來", { exact: true }),
   ).toBeVisible();
@@ -135,7 +145,7 @@ test("signed-in progress separated from guest; local logout preserves translator
 }) => {
   await signedIn(page);
   await expect(page.locator(".topbar")).toContainText("70 XP");
-  await page.getByRole("button", { name: "切換體驗檔案" }).click();
+  await page.getByRole("button", { name: "帳號與登入" }).click();
   await expect(page.getByLabel("新增體驗檔案")).toHaveCount(0);
   let scope = "";
   await page.route(`${api}/logout?**`, (r) => {
@@ -143,6 +153,10 @@ test("signed-in progress separated from guest; local logout preserves translator
     return r.fulfill({ status: 204 });
   });
   await page.getByRole("button", { name: "登出這個帳號" }).click();
+  await expect(page.getByRole("region", { name: "Google 帳號" })).toHaveCount(
+    0,
+  );
+  await page.getByRole("button", { name: "帳號與登入" }).click();
   await expect(
     page.getByRole("button", { name: "使用 Google 登入" }),
   ).toBeVisible();
@@ -218,6 +232,10 @@ test("logout failure clears local session and reports incomplete revocation", as
     r.fulfill({ status: 400, json: { msg: "temporary error" } }),
   );
   await page.getByRole("button", { name: "登出這個帳號" }).click();
+  await expect(page.getByRole("region", { name: "Google 帳號" })).toHaveCount(
+    0,
+  );
+  await page.getByRole("button", { name: "帳號與登入" }).click();
   await expect(page.getByRole("alert")).toContainText("伺服器未能確認登出");
   await expect(
     page.getByRole("button", { name: "使用 Google 登入" }),

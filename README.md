@@ -2,11 +2,13 @@
 
 AI-powered Japanese and English learning web app
 
-## 語言小島 v0.3.0
+## 語言小島 v0.3.1
 
 React + Vite + TypeScript + PWA，繁體中文、手機優先的小島學習介面。新增 Supabase Google 登入程式；正式啟用前須確認下方回跳網址設定。學習進度仍存在本機，尚無雲端同步。
 
 ### Google 登入
+
+點右上角原有的圓形頭像／小芽圖示，進入帳號頁使用 Google 登入、登出或管理訪客體驗檔案。首頁不再顯示大型登入卡片；登入錯誤仍會顯示提示。
 
 - 共用 ai-translator 的 Supabase Auth；前端只使用 Publishable Key。沒有建立新 Supabase Project 或修改翻譯資料表／Functions／Secrets。
 - PKCE 登入回到 APP 根路徑，適用 GitHub Pages；一次性交換 code 後清除網址參數，取消／過期／網路錯誤顯示繁體中文提示。
