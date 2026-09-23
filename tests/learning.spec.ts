@@ -112,6 +112,231 @@ async function finish(
   for (let i = 0; i < qs.length; i++)
     await answerQuestion(page, qs[i], i < count);
 }
+
+// Native SpeechRecognition is replaced only to deterministically simulate a
+// stalled service. Mobile actions below use real touch input, not forced clicks.
+async function stalledSpeech(page: Page, failure = "") {
+  await page.addInitScript((mode) => {
+    const w = window as any;
+    w.__speechInstances = [];
+    class SpeechStub {
+      onresult: any = null;
+      onerror: any = null;
+      onend: any = null;
+      lateResult: any;
+      lateError: any;
+      lateEnd: any;
+      stops = 0;
+      aborts = 0;
+      constructor() {
+        if (mode === "constructor") throw new Error("constructor failed");
+        w.__speechInstances.push(this);
+      }
+      start() {
+        this.lateResult = this.onresult;
+        this.lateError = this.onerror;
+        this.lateEnd = this.onend;
+        if (mode === "start") throw new Error("start failed");
+      }
+      stop() {
+        this.stops++;
+        if (mode === "cleanup") throw new Error("stop failed");
+        // Deliberately never fires end.
+      }
+      abort() {
+        this.aborts++;
+        if (mode === "cleanup") throw new Error("abort failed");
+      }
+    }
+    w.SpeechRecognition = mode === "unsupported" ? undefined : SpeechStub;
+    w.webkitSpeechRecognition = undefined;
+  }, failure);
+  await enter(page);
+  for (const q of questions("ja", "beginner", 0).slice(0, 4))
+    await answerQuestion(page, q);
+  await page.getByRole("checkbox").check();
+}
+
+async function touchOrClick(page: Page, name: string) {
+  const control = page.getByRole("button", { name, exact: true });
+  if (await page.evaluate(() => navigator.maxTouchPoints > 0))
+    await control.tap();
+  else await control.click();
+}
+
+test("speech recovery: touch stop/restart and X work without end callbacks or overlays", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await stalledSpeech(page);
+  await touchOrClick(page, "開始語音辨識");
+  await touchOrClick(page, "停止辨識");
+  await expect(
+    page.getByRole("button", { name: "開始語音辨識" }),
+  ).toBeEnabled();
+  await expect(page.getByLabel("辨識文字／手動輸入")).toBeEnabled();
+  await touchOrClick(page, "開始語音辨識");
+  await page.evaluate(() => {
+    const old = (window as any).__speechInstances[0];
+    old.lateResult({
+      results: [{ isFinal: true, 0: { transcript: "stale" } }],
+    });
+    old.lateError({ error: "network" });
+    old.lateEnd();
+  });
+  await expect(page.getByLabel("辨識文字／手動輸入")).toHaveValue("");
+  await expect(page.getByRole("button", { name: "停止辨識" })).toBeEnabled();
+  await touchOrClick(page, "離開關卡");
+  await expect(
+    page.getByRole("button", { name: "1 第一句問候", exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(() =>
+      (window as any).__speechInstances.map((r: any) => ({
+        stops: r.stops,
+        aborts: r.aborts,
+        detached: !r.onresult && !r.onerror && !r.onend,
+      })),
+    ),
+  ).toEqual([
+    { stops: 1, aborts: 1, detached: true },
+    { stops: 1, aborts: 1, detached: true },
+  ]);
+  await page.clock.fastForward(16000);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("speech recovery: silent service stops after 15 seconds and can restart", async ({
+  page,
+}) => {
+  await stalledSpeech(page);
+  // Freeze the clock before starting so slow touch/CI scheduling cannot consume
+  // part of the 15-second window while the test is issuing its assertions.
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
+  await touchOrClick(page, "開始語音辨識");
+  await page.clock.fastForward(14999);
+  await expect(page.getByRole("button", { name: "停止辨識" })).toBeEnabled();
+  await page.clock.fastForward(1);
+  await expect(page.getByRole("alert")).toContainText("15 秒");
+  await expect(
+    page.getByRole("button", { name: "開始語音辨識" }),
+  ).toBeEnabled();
+  await expect(page.getByLabel("辨識文字／手動輸入")).toBeEnabled();
+  await touchOrClick(page, "開始語音辨識");
+  await touchOrClick(page, "停止辨識");
+  await page.clock.fastForward(16000);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.locator(".speech-results")).toHaveCount(0);
+});
+
+test("speech recovery: error, end and final result reset without extra callbacks", async ({
+  page,
+}) => {
+  await stalledSpeech(page);
+  for (const error of [
+    "not-allowed",
+    "service-not-allowed",
+    "network",
+    "audio-capture",
+    "no-speech",
+  ]) {
+    await touchOrClick(page, "開始語音辨識");
+    await page.evaluate(
+      (value) =>
+        (window as any).__speechInstances.at(-1).onerror({ error: value }),
+      error,
+    );
+    await expect(
+      page.getByRole("button", { name: "開始語音辨識" }),
+    ).toBeEnabled();
+    await expect(page.getByRole("alert")).toBeVisible();
+    await expect(page.getByLabel("辨識文字／手動輸入")).toBeEnabled();
+  }
+  await touchOrClick(page, "開始語音辨識");
+  await page.evaluate(() => (window as any).__speechInstances.at(-1).onend());
+  await expect(
+    page.getByRole("button", { name: "開始語音辨識" }),
+  ).toBeEnabled();
+  await touchOrClick(page, "開始語音辨識");
+  await page.evaluate(() =>
+    (window as any).__speechInstances.at(-1).onresult({
+      results: [{ isFinal: true, 0: { transcript: "私は学生です。" } }],
+    }),
+  );
+  await expect(page.getByLabel("辨識文字／手動輸入")).toHaveValue(
+    "私は学生です。",
+  );
+  await expect(
+    page.getByRole("button", { name: "開始語音辨識" }),
+  ).toBeEnabled();
+  await touchOrClick(page, "比對內容");
+  await expect(page.getByText("尚未評估", { exact: true })).toHaveCount(4);
+  await touchOrClick(page, "確認答案");
+  await page.clock.fastForward(3000);
+  await expect(page.locator(".lesson-top")).toContainText("6 / 10");
+  await page.clock.fastForward(16000);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+test("speech recovery: offline stops active recognition and blocks only a new start", async ({
+  page,
+}) => {
+  await stalledSpeech(page);
+  await touchOrClick(page, "開始語音辨識");
+  await page.context().setOffline(true);
+  await expect(page.getByRole("alert")).toContainText("網路已中斷");
+  await expect(
+    page.getByRole("button", { name: "開始語音辨識" }),
+  ).toBeEnabled();
+  await touchOrClick(page, "開始語音辨識");
+  await expect(page.getByRole("alert")).toContainText("目前沒有網路");
+  expect(
+    await page.evaluate(() => (window as any).__speechInstances.length),
+  ).toBe(1);
+  await page.context().setOffline(false);
+  await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(true);
+  await touchOrClick(page, "開始語音辨識");
+  await touchOrClick(page, "離開關卡");
+});
+
+for (const failure of ["constructor", "start", "cleanup", "unsupported"])
+  test(
+    "speech recovery: native " + failure + " failure cannot block navigation",
+    async ({ page }) => {
+      const errors: string[] = [];
+      page.on("pageerror", (error) => errors.push(error.message));
+      await stalledSpeech(page, failure);
+      if (failure === "unsupported") {
+        await expect(
+          page.getByRole("button", { name: "開始語音辨識" }),
+        ).toBeDisabled();
+        await expect(
+          page.getByText("目前瀏覽器沒有提供語音辨識", { exact: false }),
+        ).toBeVisible();
+      } else {
+        await touchOrClick(page, "開始語音辨識");
+        if (failure === "cleanup") {
+          await touchOrClick(page, "停止辨識");
+          await expect(
+            page.getByRole("button", { name: "開始語音辨識" }),
+          ).toBeEnabled();
+          await touchOrClick(page, "開始語音辨識");
+        } else {
+          await expect(
+            page.getByRole("button", { name: "開始語音辨識" }),
+          ).toBeEnabled();
+          await expect(page.getByRole("alert")).toContainText("無法啟動");
+        }
+      }
+      await touchOrClick(page, "離開關卡");
+      await expect(
+        page.getByRole("button", { name: "1 第一句問候", exact: true }),
+      ).toBeVisible();
+      expect(errors).toEqual([]);
+    },
+  );
 test("course has 48 distinct lessons, hierarchy and all score bands", () => {
   const ids = new Set<string>(),
     targets = new Set<string>();

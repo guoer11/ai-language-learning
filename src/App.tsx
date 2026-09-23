@@ -1221,7 +1221,7 @@ export default function App({
           )}
           <footer>
             語言小島 <span>·</span> 一起學習，一起看見更大的世界。
-            <small>v0.5.0 · 學習體驗版</small>
+            <small>v0.5.1 · 學習體驗版</small>
           </footer>
         </main>
         <nav className="mobile-nav">
