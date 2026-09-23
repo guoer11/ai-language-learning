@@ -1,3 +1,4 @@
+import { scenarioReadings } from "./communication";
 // Curated readings for this curriculum. Longest-match keeps compounds together.
 export const readings: Record<string, string> = {
   動詞: "どうし",
@@ -67,7 +68,7 @@ export const readings: Record<string, string> = {
   思い: "おもい",
 };
 // Context-specific reading: 何ですか is なんですか, while 何が is なにが.
-const dictionary = { ...readings, 何です: "なんです" };
+const dictionary = { ...readings, ...scenarioReadings, 何です: "なんです" };
 const keys = Object.keys(dictionary).sort((a, b) => b.length - a.length);
 export function readingParts(
   text: string,

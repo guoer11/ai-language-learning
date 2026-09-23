@@ -93,7 +93,9 @@ async function answerQuestion(
     );
     await page
       .getByRole("button", {
-        name: q.type === "speaking" ? "查看學習成果" : "下一題",
+        name: q.id.endsWith(":situational-speaking")
+          ? "查看學習成果"
+          : "下一題",
         exact: true,
       })
       .click();
@@ -101,7 +103,7 @@ async function answerQuestion(
 }
 async function finish(
   page: Page,
-  count = 5,
+  count = 10,
   language: Language = "ja",
   level: Level = "beginner",
   lesson = 0,
@@ -120,7 +122,18 @@ test("course has 48 distinct lessons, hierarchy and all score bands", () => {
       expect(c.worlds[0].units).toHaveLength(2);
       for (const lesson of c.worlds[0].units.flatMap((u) => u.lessons)) {
         const qs = questions(l, v, lesson.index);
-        expect(qs).toHaveLength(5);
+        expect(qs).toHaveLength(10);
+        expect(qs.filter((q) => q.type === "speaking")).toHaveLength(2);
+        expect(qs.filter((q) => q.audioOnly)).toHaveLength(2);
+        expect(qs[4].target).not.toBe(qs[9].target);
+        expect(new Set(qs.map((q) => q.studyText)).size).toBeGreaterThanOrEqual(
+          7,
+        );
+        expect(qs[6].target).toContain("＿＿＿");
+        expect(qs[6].target.replace("＿＿＿", qs[6].answer!)).toBe(
+          qs[6].studyText,
+        );
+        expect(qs[6].hideAudio).toBe(true);
         expect(
           new Set([
             qs[1].studyText,
@@ -153,7 +166,7 @@ test("course has 48 distinct lessons, hierarchy and all score bands", () => {
         }
       }
     }
-  expect(ids.size).toBe(240);
+  expect(ids.size).toBe(480);
   expect(targets.size).toBe(48);
   expect([0, 20, 40, 60, 80, 100].map(starsForScore)).toEqual([
     0, 0, 0, 1, 2, 3,
@@ -180,9 +193,9 @@ test("correct answer waits three seconds, wrong answer stays, exit cancels pendi
     .click();
   await page.getByRole("button", { name: "確認答案" }).click();
   await page.clock.runFor(2000);
-  await expect(page.locator(".lesson-top")).toContainText("1 / 5");
+  await expect(page.locator(".lesson-top")).toContainText("1 / 10");
   await page.clock.runFor(1000);
-  await expect(page.locator(".lesson-top")).toContainText("2 / 5");
+  await expect(page.locator(".lesson-top")).toContainText("2 / 10");
   const wrong = qs[1].options!.find((o) => o !== qs[1].answer)!;
   await page
     .getByRole("button", {
@@ -194,7 +207,7 @@ test("correct answer waits three seconds, wrong answer stays, exit cancels pendi
   await expect(page.locator(".answer-explanation")).toContainText("徵求許可");
   await expect(page.locator(".answer-explanation rt")).not.toHaveCount(0);
   await page.clock.fastForward(10000);
-  await expect(page.locator(".lesson-top")).toContainText("2 / 5");
+  await expect(page.locator(".lesson-top")).toContainText("2 / 10");
   await page.getByRole("button", { name: "下一題", exact: true }).click();
   expect(qs[2].tokens).toEqual([
     "予約",
@@ -218,7 +231,7 @@ test("correct answer waits three seconds, wrong answer stays, exit cancels pendi
   await page.clock.fastForward(5000);
   await expect(page.locator(".lesson-shell")).toHaveCount(0);
   await page.getByRole("button", { name: "1 選擇座位", exact: true }).click();
-  await expect(page.locator(".lesson-top")).toContainText("1 / 5");
+  await expect(page.locator(".lesson-top")).toContainText("1 / 10");
 });
 test("complete flow, unlock, persistence and independent profiles", async ({
   page,
@@ -227,7 +240,7 @@ test("complete flow, unlock, persistence and independent profiles", async ({
   page.on("pageerror", (e) => errors.push(e.message));
   await enter(page);
   await finish(page);
-  await expect(page.getByText("+70", { exact: true })).toBeVisible();
+  await expect(page.getByText("+120", { exact: true })).toBeVisible();
   await expect(page.getByText("★★★", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "前往下一關" }).click();
   await expect(page.locator(".target ruby")).toContainText("水");
@@ -240,7 +253,7 @@ test("complete flow, unlock, persistence and independent profiles", async ({
     page.getByRole("button", { name: "3 表達感謝 尚未解鎖", exact: true }),
   ).toBeDisabled();
   await page.reload();
-  await expect(page.getByText("⚡ 70 XP", { exact: true })).toBeVisible();
+  await expect(page.getByText("⚡ 120 XP", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "帳號與登入", exact: true }).click();
   await page.getByLabel("新增體驗檔案").fill("家人二號");
   await page.getByRole("button", { name: "新增", exact: true }).click();
@@ -251,14 +264,14 @@ test("complete flow, unlock, persistence and independent profiles", async ({
   ).toBeDisabled();
   expect(errors).toEqual([]);
 });
-for (const correct of [0, 3, 4])
+for (const correct of [0, 5, 6, 8])
   test("achievable score band " + correct, async ({ page }) => {
     await enter(page);
     await finish(page, correct);
     await expect(page.locator(".result-stars")).toHaveText(
-      correct === 0 ? "☆☆☆" : correct === 3 ? "★☆☆" : "★★☆",
+      correct < 6 ? "☆☆☆" : correct === 6 ? "★☆☆" : "★★☆",
     );
-    if (correct === 0) {
+    if (correct < 6) {
       await page
         .getByRole("button", { name: "回到冒險地圖", exact: true })
         .click();
@@ -274,7 +287,7 @@ test("weakness replay clears list, best stars do not double count", async ({
   page,
 }) => {
   await enter(page);
-  await finish(page, 3);
+  await finish(page, 6);
   await page.getByRole("button", { name: "弱點複習", exact: true }).click();
   await page.getByRole("button", { name: /第一句問候 初階/ }).click();
   await finish(page);
@@ -291,7 +304,7 @@ test("weakness replay clears list, best stars do not double count", async ({
     page
       .locator(".stat")
       .filter({ hasText: "累積 XP" })
-      .getByText("120", { exact: true }),
+      .getByText("200", { exact: true }),
   ).toBeVisible();
 });
 test("old progress retained and new lessons do not overwrite records", async ({
@@ -328,15 +341,18 @@ test("old progress retained and new lessons do not overwrite records", async ({
       );
   });
   await enter(page);
-  await finish(page, 4);
+  await finish(page, 8);
   const saved = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("learning-demo-v1")!),
   );
   expect(saved.profiles[0].attempts).toHaveLength(2);
   expect(saved.profiles[0].attempts[0].id).toBe("legacy");
-  expect(saved.profiles[0].attempts[1].curriculumVersion).toBe(3);
+  expect(saved.profiles[0].attempts[1].curriculumVersion).toBe(4);
   expect(saved.profiles[0].attempts[1].oral.source).toBe("typed");
   expect(saved.profiles[0].attempts[1].oral.pronunciation).toBeNull();
+  expect(saved.profiles[0].attempts[1].oralAttempts).toHaveLength(2);
+  expect(saved.profiles[0].attempts[0].xp).toBe(50);
+  expect(saved.profiles[0].attempts[0].stars).toBe(3);
 });
 test("advanced English content, mobile layout and installation dialog", async ({
   page,
@@ -351,8 +367,8 @@ test("advanced English content, mobile layout and installation dialog", async ({
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.getByRole("button", { name: "知道了" }).click();
   await enter(page, "en", "advanced");
-  await finish(page, 5, "en", "advanced");
-  await expect(page.getByText("+70", { exact: true })).toBeVisible();
+  await finish(page, 10, "en", "advanced");
+  await expect(page.getByText("+120", { exact: true })).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -408,11 +424,12 @@ test("browser speech requires consent, transcript evaluated without pronunciatio
   ).toBeVisible();
   await page.getByRole("button", { name: "確認答案" }).click();
   await page.clock.fastForward(3000);
-  await expect(page.getByText("+70", { exact: true })).toBeVisible();
+  for (const q of qs.slice(5)) await answerQuestion(page, q);
+  await expect(page.getByText("+120", { exact: true })).toBeVisible();
   const saved = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("learning-demo-v1")!),
   );
-  expect(saved.profiles[0].attempts[0].oral.source).toBe("browser");
+  expect(saved.profiles[0].attempts[0].oralAttempts[0].source).toBe("browser");
   expect(await page.evaluate(() => (window as any).__aborted)).toBe(true);
 });
 test("speech denial and recording denial allow typed fallback", async ({
@@ -448,8 +465,9 @@ test("speech denial and recording denial allow typed fallback", async ({
     await answerQuestion(page, q);
   await page.getByRole("button", { name: "錄音回放", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("無法錄音");
-  await answerQuestion(page, questions("ja", "beginner", 0)[4]);
-  await expect(page.getByText("+70", { exact: true })).toBeVisible();
+  for (const q of questions("ja", "beginner", 0).slice(4))
+    await answerQuestion(page, q);
+  await expect(page.getByText("+120", { exact: true })).toBeVisible();
 });
 test("recording playback deletes blob and stops microphone on exit", async ({
   page,
