@@ -92,6 +92,9 @@ export default function App({
   const [correct, setCorrect] = useState(0);
   const [wrong, setWrong] = useState<string[]>([]);
   const [oral, setOral] = useState<OralResult | null>(null);
+  const [oralAttempts, setOralAttempts] = useState<
+    NonNullable<Attempt["oral"]>[]
+  >([]);
   const [showAudioText, setShowAudioText] = useState(false);
   const [result, setResult] = useState<Attempt | null>(null);
   const [name, setName] = useState("");
@@ -153,6 +156,7 @@ export default function App({
     setOrder([]);
     setChecked(false);
     setCorrect(0);
+    setOralAttempts([]);
     setWrong([]);
     setOral(null);
     setShowAudioText(false);
@@ -186,6 +190,9 @@ export default function App({
     if (checked) return;
     setChecked(true);
     setCountdown(3);
+    if (q.type === "speaking" && oral) {
+      setOralAttempts((items) => [...items, { questionId: q.id, ...oral }]);
+    }
     if (isCorrect) setCorrect((v) => v + 1);
     else setWrong((w) => [...w, q.id]);
   }
@@ -211,8 +218,9 @@ export default function App({
       xp: passed ? 20 + correct * 10 : correct * 10,
       stars,
       wrong,
-      mock: oral?.source === "demo",
-      curriculumVersion: 3,
+      mock: oralAttempts.some((item) => item.source === "demo"),
+      curriculumVersion: 4,
+      oralAttempts,
       oral: oral ? { questionId: q.id, ...oral } : undefined,
     };
     setSave((s) => ({
@@ -588,7 +596,7 @@ export default function App({
               </section>
               <div className="map-layout">
                 {profile.attempts.some(
-                  (a) => a.path === path && a.curriculumVersion !== 3,
+                  (a) => a.path === path && a.curriculumVersion !== 4,
                 ) && (
                   <p className="legacy-note">
                     已保留舊版的星星與解鎖進度；這次新增的題目，可以重玩關卡補練。
@@ -667,7 +675,11 @@ export default function App({
                   <section className="panel">
                     <div className="big-emoji">🎒</div>
                     <h3>你的冒險背包</h3>
-                    <p>每關 5 題：單字、翻譯、排列、聽力與口說內容比對。</p>
+                    <p>
+                      每關 10
+                      題：單字、翻譯、組句、填空、情境接話、理解用意、兩題聽力與兩題口說。答對
+                      6 題即可過關，8 題獲得 2 星，全對獲得 3 星。
+                    </p>
                     <ul>
                       <li>60 分以上即可解鎖下一關</li>
                       <li>答對越多，星星越多</li>
@@ -714,20 +726,23 @@ export default function App({
                 <span className="tag">{q.label}</span>
                 <h1>{q.prompt}</h1>
                 <p>
-                  {q.type === "order"
-                    ? q.translation
-                    : "慢慢來，這裡可以放心練習。"}
+                  {q.context ||
+                    (q.type === "order"
+                      ? q.translation
+                      : "慢慢來，這裡可以放心練習。")}
                 </p>
               </div>
               {q.type !== "order" && (
                 <div className="target">
-                  <button
-                    className="audio-button"
-                    onClick={speak}
-                    aria-label="播放裝置語音"
-                  >
-                    <Volume2 />
-                  </button>
+                  {!q.hideAudio && (
+                    <button
+                      className="audio-button"
+                      onClick={speak}
+                      aria-label="播放裝置語音"
+                    >
+                      <Volume2 />
+                    </button>
+                  )}
                   <div lang={q.label === "中文選外語" ? "zh-Hant" : language}>
                     {!q.audioOnly || checked || showAudioText ? (
                       <JapaneseText
@@ -1206,7 +1221,7 @@ export default function App({
           )}
           <footer>
             語言小島 <span>·</span> 一起學習，一起看見更大的世界。
-            <small>v0.4.1 · 學習體驗版</small>
+            <small>v0.5.0 · 學習體驗版</small>
           </footer>
         </main>
         <nav className="mobile-nav">
