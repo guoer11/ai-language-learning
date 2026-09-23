@@ -73,6 +73,9 @@ export default function OralPractice({
     recorder = useRef<MediaRecorder | null>(null),
     url = useRef(""),
     timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined),
+    recognitionTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+      undefined,
+    ),
     alive = useRef(true),
     request = useRef(0),
     callback = useRef(onChange);
@@ -80,22 +83,39 @@ export default function OralPractice({
   const Speech =
     (window as SpeechWindow).SpeechRecognition ||
     (window as SpeechWindow).webkitSpeechRecognition;
+  function stopRecognition() {
+    // Release UI/ownership before native calls: stop/end can be missing or throw.
+    clearTimeout(recognitionTimer.current);
+    recognitionTimer.current = undefined;
+    const r = rec.current;
+    rec.current = null;
+    if (alive.current) setListening(false);
+    if (!r) return;
+    r.onresult = null;
+    r.onerror = null;
+    r.onend = null;
+    try {
+      r.stop();
+    } catch {
+      /* May already be stopped by the browser. */
+    }
+    try {
+      r.abort();
+    } catch {
+      /* Cleanup must never prevent navigation. */
+    }
+  }
   function stopAll() {
     request.current++;
     clearTimeout(timer.current);
-    if (rec.current) {
-      rec.current.onresult = null;
-      rec.current.onerror = null;
-      rec.current.onend = null;
-      rec.current.abort();
-      rec.current = null;
-    }
+    stopRecognition();
     if (recorder.current?.state === "recording") recorder.current.stop();
     stream.current?.getTracks().forEach((t) => t.stop());
     stream.current = null;
   }
   useEffect(() => {
     alive.current = true;
+    setListening(false);
     const onHidden = () => {
       if (document.hidden) {
         stopAll();
@@ -104,77 +124,89 @@ export default function OralPractice({
         setPending(false);
       }
     };
+    const onOffline = () => {
+      if (!rec.current) return;
+      stopRecognition();
+      setError("網路已中斷，語音辨識已停止。可重新連線再試，或改用輸入。");
+    };
     document.addEventListener("visibilitychange", onHidden);
+    window.addEventListener("offline", onOffline);
     return () => {
       alive.current = false;
       stopAll();
       if (url.current) URL.revokeObjectURL(url.current);
       document.removeEventListener("visibilitychange", onHidden);
+      window.removeEventListener("offline", onOffline);
     };
-  }, []);
+  }, [q.id, language]);
   function clearResult() {
     setResult(null);
     callback.current(null);
   }
   function recognize() {
-    if (!Speech || !consent) return;
-    clearTimeout(timer.current);
-    if (rec.current) {
-      rec.current.onresult = null;
-      rec.current.onerror = null;
-      rec.current.onend = null;
-      rec.current.abort();
+    if (locked || !consent || recording || pending) return;
+    stopRecognition();
+    if (!Speech) {
+      setError("目前瀏覽器不支援語音辨識，可改用輸入或錄音回放。");
+      return;
     }
-    window.speechSynthesis?.cancel();
+    if (!navigator.onLine) {
+      setError("目前沒有網路，請連線後再試語音辨識，或改用輸入。");
+      return;
+    }
     clearResult();
     setText("");
     setError("");
     setSource("browser");
-    const r = new Speech();
-    rec.current = r;
-    r.lang = language === "ja" ? "ja-JP" : "en-US";
-    r.continuous = false;
-    r.interimResults = false;
-    r.onresult = (e) => {
-      if (!alive.current) return;
-      const transcript = Array.from(e.results)
-        .filter((x) => x.isFinal)
-        .map((x) => x[0].transcript)
-        .join(" ");
-      setText(transcript);
-      setSource("browser");
-    };
-    r.onerror = (e) => {
-      if (!alive.current) return;
-      setError(
-        (
-          {
-            "not-allowed":
-              "麥克風或語音辨識權限未開啟。請在瀏覽器設定允許，或改用輸入。",
-            "no-speech": "沒有聽到聲音，請再試一次。",
-            network: "語音辨識服務連線失敗，請確認網路或改用輸入。",
-            "audio-capture": "無法取得麥克風，請確認沒有被其他程式使用。",
-          } as Record<string, string>
-        )[e.error] || "此裝置的語音辨識暫時無法使用，可改用輸入或錄音回放。",
-      );
-      setListening(false);
-      clearTimeout(timer.current);
-    };
-    r.onend = () => {
-      if (alive.current) setListening(false);
-      clearTimeout(timer.current);
-    };
     try {
+      window.speechSynthesis?.cancel();
+      const r = new Speech();
+      rec.current = r;
+      r.lang = language === "ja" ? "ja-JP" : "en-US";
+      r.continuous = false;
+      r.interimResults = false;
+      r.onresult = (e) => {
+        if (!alive.current || rec.current !== r) return;
+        const transcript = Array.from(e.results)
+          .filter((x) => x.isFinal)
+          .map((x) => x[0].transcript)
+          .join(" ");
+        if (!transcript.trim()) return;
+        setText(transcript);
+        setSource("browser");
+        // Single-utterance exercise: a final result must not wait forever for end.
+        stopRecognition();
+      };
+      r.onerror = (e) => {
+        if (!alive.current || rec.current !== r) return;
+        setError(
+          (
+            {
+              "not-allowed":
+                "麥克風或語音辨識權限未開啟。請在瀏覽器設定允許，或改用輸入。",
+              "service-not-allowed":
+                "瀏覽器不允許使用語音辨識服務，請改用輸入。",
+              "no-speech": "沒有聽到聲音，請再試一次。",
+              network: "語音辨識服務連線失敗，請確認網路或改用輸入。",
+              "audio-capture": "無法取得麥克風，請確認沒有被其他程式使用。",
+            } as Record<string, string>
+          )[e.error] || "此裝置的語音辨識暫時無法使用，可改用輸入或錄音回放。",
+        );
+        stopRecognition();
+      };
+      r.onend = () => {
+        if (alive.current && rec.current === r) stopRecognition();
+      };
       setListening(true);
-      timer.current = setTimeout(() => {
-        r.stop();
-        if (alive.current) setListening(false);
-      }, 60000);
+      recognitionTimer.current = setTimeout(() => {
+        if (!alive.current || rec.current !== r) return;
+        stopRecognition();
+        setError("已達 15 秒，語音辨識已自動停止。請再試一次，或改用輸入。");
+      }, 15000);
       r.start();
     } catch {
-      clearTimeout(timer.current);
+      stopRecognition();
       setError("無法啟動語音辨識，請改用輸入。");
-      setListening(false);
     }
   }
   async function record() {
@@ -262,8 +294,11 @@ export default function OralPractice({
       <div className="oral-controls">
         <button
           className="primary"
-          disabled={locked || !Speech || !consent || recording || pending}
-          onClick={() => (listening ? rec.current?.stop() : recognize())}
+          disabled={
+            !listening &&
+            (locked || !Speech || !consent || recording || pending)
+          }
+          onClick={() => (listening ? stopRecognition() : recognize())}
         >
           {listening ? <Square size={18} /> : <Mic size={18} />}{" "}
           {listening ? "停止辨識" : "開始語音辨識"}
